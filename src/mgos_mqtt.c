@@ -134,20 +134,7 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       break;
     }
     case MG_EV_POLL: {
-      struct mg_mqtt_proto_data *pd =
-          (struct mg_mqtt_proto_data *) nc->proto_data;
-      double now = mg_time();
-      if (pd->keep_alive > 0 && (now - nc->last_io_time) > pd->keep_alive) {
-        LOG(LL_DEBUG, ("Send PINGREQ"));
-        mg_mqtt_ping(nc);
-        nc->last_io_time = (time_t) mg_time();
-      }
       call_global_handlers(nc, ev, NULL, user_data);
-      break;
-    }
-    case MG_EV_MQTT_PINGRESP: {
-      /* Do nothing here */
-      LOG(LL_DEBUG, ("Got PINGRESP"));
       break;
     }
     case MG_EV_MQTT_CONNACK: {
