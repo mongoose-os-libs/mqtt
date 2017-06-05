@@ -6,8 +6,6 @@ version: 1.0
 skeleton_version: 2017-05-18
 sources:
   - src
-filesystem:
-  - fs
 config_schema:
   - ["mqtt", "o", {title: "MQTT settings"}]
   - ["mqtt.enable", "b", false, {title: "Enable MQTT"}]
