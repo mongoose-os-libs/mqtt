@@ -1,6 +1,5 @@
 author: mongoose-os
-name: mqtt
-description: MQTT support for mOS
+description: MQTT protocol support
 type: lib
 version: 1.0
 skeleton_version: 2017-05-18
@@ -31,3 +30,5 @@ cdefs:
   MG_ENABLE_MQTT: 1
 tags:
   - mqtt
+  - c
+  - js
