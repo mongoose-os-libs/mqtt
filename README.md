@@ -1,1 +1,1 @@
-# MQTT support for mOS
+# MQTT protocol support
