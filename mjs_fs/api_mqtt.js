@@ -1,10 +1,3 @@
-// MQTT API. Source C API is defined at:
-// [mgos_mqtt.h](https://github.com/cesanta/mongoose-os/blob/master/fw/src/mgos_mqtt.h)
-//
-// This API provides publish and subscribe functions. The MQTT server should
-// be configured via the `mqtt` configuration section, or dynamically, like
-// `mos config-set mqtt.server=broker.hivemq.com:1883`.
-
 let MQTT = {
   _sub: ffi('void mgos_mqtt_sub(char *, void (*)(void *, void *, int, void *, int, userdata), userdata)'),
   _subf: function(conn, topic, len1, msg, len2, ud) {
