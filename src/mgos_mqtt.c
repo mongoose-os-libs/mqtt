@@ -215,20 +215,22 @@ static void mgos_mqtt_wifi_ready(enum mgos_wifi_status event, void *arg) {
 }
 #endif
 
-static void s_debug_write_hook(
-    enum mgos_hook_type type,
-    const struct mgos_hook_arg *arg, void *userdata) {
-
+static void s_debug_write_hook(enum mgos_hook_type type,
+                               const struct mgos_hook_arg *arg,
+                               void *userdata) {
   const struct sys_config *cfg = get_cfg();
-  const char *topic = (arg->debug.fd == 1 ? cfg->debug.stdout_topic
-      : arg->debug.fd == 2 ? cfg->debug.stderr_topic : NULL);
+  const char *topic =
+      (arg->debug.fd == 1
+           ? cfg->debug.stdout_topic
+           : arg->debug.fd == 2 ? cfg->debug.stderr_topic : NULL);
   if (topic != NULL &&
       mgos_mqtt_num_unsent_bytes() < MGOS_MQTT_LOG_PUSHBACK_THRESHOLD) {
     static uint32_t s_seq = 0;
     char *msg = arg->debug.buf;
-    int msg_len = mg_asprintf(&msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
-        (cfg->device.id ? cfg->device.id : "-"), s_seq,
-        mg_time(), arg->debug.fd, (int) arg->debug.len, arg->debug.data);
+    int msg_len =
+        mg_asprintf(&msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
+                    (cfg->device.id ? cfg->device.id : "-"), s_seq, mg_time(),
+                    arg->debug.fd, (int) arg->debug.len, arg->debug.data);
     if (arg->debug.len > 0) {
       mgos_mqtt_pub(topic, msg, msg_len, 0 /* qos */);
       s_seq++;
