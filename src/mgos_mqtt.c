@@ -309,7 +309,9 @@ static void reconnect_timer_cb(void *user_data) {
 
 static void mqtt_global_reconnect(void) {
   const struct sys_config_mqtt *smcfg = &get_cfg()->mqtt;
-  int rt_ms = s_reconnect_timeout_ms * 2;
+  int rt_ms;
+  if (s_reconnect_timeout_ms <= 0) s_reconnect_timeout_ms = 1;
+  rt_ms = s_reconnect_timeout_ms * 2;
   if (smcfg->server == NULL) return;
 
   if (rt_ms < smcfg->reconnect_timeout_min * 1000) {
