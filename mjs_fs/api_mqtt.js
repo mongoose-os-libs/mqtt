@@ -41,4 +41,19 @@ let MQTT = {
     qos = qos || 0;
     return this._pub(t, m, m.length, qos);
   },
+
+  // ## **`MQTT.setEventHandler(handler, userdata)`**
+  // Set MQTT connection event handler. Event handler is
+  // `ev_handler(conn, ev, edata)`, where `conn` is an opaque connection handle,
+  // `ev` is an event number, `edata` is an event-specific data.
+  // `ev` values could be low-level network events, like `Net.EV_CLOSE`
+  // or `Net.EV_POLL`, or MQTT specific events, like `MQTT.EV_CONNACK`.
+  //
+  // Example:
+  // ```javascript
+  // MQTT.setEventHandler(function(conn, ev, edata) {
+  //   if (ev !== 0) print('MQTT event handler: got', ev);
+  // }, null);
+  // ```
+  setEventHandler: ffi('void mgos_mqtt_add_global_handler(void (*)(void *, int, void *, userdata), userdata)'),
 };
