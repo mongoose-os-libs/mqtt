@@ -1,4 +1,0 @@
-skeleton_version: 2017-05-18
-config_schema:
-  - ["debug.stdout_topic", "esp32_??????/log"]
-  - ["debug.stderr_topic", "esp32_??????/log"]
