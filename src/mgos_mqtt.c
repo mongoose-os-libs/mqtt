@@ -12,13 +12,13 @@
 #include "common/mg_str.h"
 #include "common/platform.h"
 #include "common/queue.h"
-#include "fw/src/mgos_hooks.h"
-#include "fw/src/mgos_mdns.h"
-#include "fw/src/mgos_mongoose.h"
-#include "fw/src/mgos_net.h"
-#include "fw/src/mgos_sys_config.h"
-#include "fw/src/mgos_timers.h"
-#include "fw/src/mgos_utils.h"
+#include "mgos_hooks.h"
+#include "mgos_mdns.h"
+#include "mgos_mongoose.h"
+#include "mgos_net.h"
+#include "mgos_sys_config.h"
+#include "mgos_timers.h"
+#include "mgos_utils.h"
 
 #ifndef MGOS_MQTT_LOG_PUSHBACK_THRESHOLD
 #define MGOS_MQTT_LOG_PUSHBACK_THRESHOLD 2048

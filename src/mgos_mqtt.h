@@ -8,9 +8,9 @@
 
 #include <stdbool.h>
 
-#include "fw/src/mgos_features.h"
-#include "fw/src/mgos_init.h"
-#include "fw/src/mgos_mongoose.h"
+#include "mgos_features.h"
+#include "mgos_init.h"
+#include "mgos_mongoose.h"
 
 #ifdef __cplusplus
 extern "C" {
