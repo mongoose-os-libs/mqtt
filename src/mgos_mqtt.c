@@ -15,10 +15,10 @@
 #include "fw/src/mgos_hooks.h"
 #include "fw/src/mgos_mdns.h"
 #include "fw/src/mgos_mongoose.h"
+#include "fw/src/mgos_net.h"
 #include "fw/src/mgos_sys_config.h"
 #include "fw/src/mgos_timers.h"
 #include "fw/src/mgos_utils.h"
-#include "fw/src/mgos_wifi.h"
 
 #ifndef MGOS_MQTT_LOG_PUSHBACK_THRESHOLD
 #define MGOS_MQTT_LOG_PUSHBACK_THRESHOLD 2048
@@ -206,14 +206,15 @@ void mgos_mqtt_set_auth_callback(mgos_mqtt_auth_callback_t cb, void *cb_arg) {
   s_auth_cb_arg = cb_arg;
 }
 
-#if MGOS_ENABLE_WIFI
-static void mgos_mqtt_wifi_ready(enum mgos_wifi_status event, void *arg) {
-  if (event != MGOS_WIFI_IP_ACQUIRED) return;
+static void mgos_mqtt_net_ev(enum mgos_net_event ev,
+                             const struct mgos_net_event_data *ev_data,
+                             void *arg) {
+  if (ev != MGOS_NET_EV_IP_ACQUIRED) return;
 
   mqtt_global_reconnect();
+  (void) ev_data;
   (void) arg;
 }
-#endif
 
 static void s_debug_write_hook(enum mgos_hook_type type,
                                const struct mgos_hook_arg *arg,
@@ -254,11 +255,7 @@ bool mgos_mqtt_init(void) {
     LOG(LL_ERROR, ("MQTT requires server name"));
     return false;
   }
-#if MGOS_ENABLE_WIFI
-  mgos_wifi_add_on_change_cb(mgos_mqtt_wifi_ready, NULL);
-#else
-  mqtt_global_reconnect();
-#endif
+  mgos_net_add_event_handler(mgos_mqtt_net_ev, NULL);
 
   mgos_hook_register(MGOS_HOOK_DEBUG_WRITE, s_debug_write_hook, NULL);
 
