@@ -211,7 +211,7 @@ static void mgos_mqtt_net_ev(enum mgos_net_event ev,
                              void *arg) {
   if (ev != MGOS_NET_EV_IP_ACQUIRED) return;
 
-  mqtt_global_reconnect();
+  mgos_mqtt_global_connect();
   (void) ev_data;
   (void) arg;
 }
@@ -262,7 +262,7 @@ bool mgos_mqtt_init(void) {
   return true;
 }
 
-static bool mqtt_global_connect(void) {
+bool mgos_mqtt_global_connect(void) {
   bool ret = true;
   struct mg_mgr *mgr = mgos_get_mgr();
   const struct sys_config *scfg = get_cfg();
@@ -298,7 +298,7 @@ static bool mqtt_global_connect(void) {
 
 static void reconnect_timer_cb(void *user_data) {
   s_reconnect_timer_id = MGOS_INVALID_TIMER_ID;
-  if (!mqtt_global_connect()) {
+  if (!mgos_mqtt_global_connect()) {
     mqtt_global_reconnect();
   }
   (void) user_data;

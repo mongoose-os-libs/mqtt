@@ -47,6 +47,13 @@ void mgos_mqtt_set_auth_callback(mgos_mqtt_auth_callback_t cb, void *cb_arg);
 struct mg_connection *mgos_mqtt_get_global_conn(void);
 
 /*
+ * Attempt MQTT connection now (if enabled and not already connected).
+ * Normally MQTT will try to connect in the background, at certain interval.
+ * This function will force immediate connection attempt.
+ */
+bool mgos_mqtt_global_connect(void);
+
+/*
  * Publish message to the configured MQTT server, to the given MQTT topic.
  * Return value will be true if there is a connection to the server and the
  * message has been queued for sending. In case of QoS 1 return value does
