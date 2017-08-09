@@ -56,4 +56,12 @@ let MQTT = {
   // }, null);
   // ```
   setEventHandler: ffi('void mgos_mqtt_add_global_handler(void (*)(void *, int, void *, userdata), userdata)'),
+
+  // Event codes.
+  EV_CONNACK: 202,   // Connection to broker has been established.
+  EV_PUBLISH: 203,   // A message has been published to one of the topics we are subscribed to.
+  EV_PUBACK: 204,    // Ack for publishing of a message with QoS > 0.
+  EV_SUBACK: 209,    // Ack for a subscribe request.
+  EV_UNSUBACK: 211,  // Ack for an unsubscribe request.
+  EV_CLOSE: 5,       // Connection to broker was closed.
 };
