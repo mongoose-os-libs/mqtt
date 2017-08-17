@@ -21,7 +21,7 @@ let MQTT = {
     return this._sub(topic, this._subf, { cb: cb, ud: ud });
   },
 
-  _pub: ffi('int mgos_mqtt_pub(char *, void *, int, int)'),
+  _pub: ffi('int mgos_mqtt_pub(char *, void *, int, int, bool)'),
 
   // ## **`MQTT.pub(topic, message, qos)`**
   // Publish message to a topic. QoS defaults to 0.
@@ -33,13 +33,13 @@ let MQTT = {
   // load('api_gpio.js');
   // let pin = 0, topic = 'my/topic';
   // GPIO.set_button_handler(pin, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, function() {
-  //   let res = MQTT.pub('my/topic', JSON.stringify({ a: 1, b: 2 }), 1);
+  //   let res = MQTT.pub('my/topic', JSON.stringify({ a: 1, b: 2 }), 1, false);
   //   print('Published:', res ? 'yes' : 'no');
   // }, null);
   // ```
-  pub: function(t, m, qos) {
+  pub: function(t, m, qos, retain) {
     qos = qos || 0;
-    return this._pub(t, m, m.length, qos);
+    return this._pub(t, m, m.length, qos, retain || false);
   },
 
   // ## **`MQTT.setEventHandler(handler, userdata)`**

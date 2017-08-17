@@ -233,7 +233,7 @@ static void s_debug_write_hook(enum mgos_hook_type type,
                     (cfg->device.id ? cfg->device.id : "-"), s_seq, mg_time(),
                     arg->debug.fd, (int) arg->debug.len, arg->debug.data);
     if (arg->debug.len > 0) {
-      mgos_mqtt_pub(topic, msg, msg_len, 0 /* qos */);
+      mgos_mqtt_pub(topic, msg, msg_len, 0 /* qos */, false);
       s_seq++;
     }
     if (msg != arg->debug.buf) free(msg);
@@ -331,14 +331,16 @@ struct mg_connection *mgos_mqtt_get_global_conn(void) {
   return s_conn;
 }
 
-bool mgos_mqtt_pub(const char *topic, const void *message, size_t len,
-                   int qos) {
+bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
+                   bool retain) {
   struct mg_connection *c = mgos_mqtt_get_global_conn();
+  int flags = MG_MQTT_QOS(qos);
+  if (retain) flags |= MG_MQTT_RETAIN;
   if (c == NULL || !s_connected) return false;
-  LOG(LL_DEBUG, ("Publishing to %s @ %d (%d): [%.*s]", topic, qos, (int) len,
-                 (int) len, (const char *) message));
-  mg_mqtt_publish(c, topic, mgos_mqtt_get_packet_id(), MG_MQTT_QOS(qos),
-                  message, len);
+  LOG(LL_DEBUG, ("Publishing to %s @ %d%s (%d): [%.*s]", topic, qos,
+                 (retain ? " (RETAIN)" : ""), (int) len, (int) len,
+                 (const char *) message));
+  mg_mqtt_publish(c, topic, mgos_mqtt_get_packet_id(), flags, message, len);
   return true;
 }
 

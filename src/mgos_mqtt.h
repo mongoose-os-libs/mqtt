@@ -60,7 +60,8 @@ bool mgos_mqtt_global_connect(void);
  * not indicate that PUBACK has been received; there is currently no way to
  * check for that.
  */
-bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos);
+bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
+                   bool retain);
 
 typedef void (*sub_handler_t)(struct mg_connection *nc, const char *topic,
                               int topic_len, const char *msg, int msg_len,
