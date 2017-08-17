@@ -2,7 +2,7 @@ author: mongoose-os
 description: MQTT protocol support
 type: lib
 version: 1.0
-skeleton_version: 2017-05-18
+manifest_version: 2017-05-18
 sources:
   - src
 config_schema:
