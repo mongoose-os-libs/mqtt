@@ -23,17 +23,18 @@ let MQTT = {
 
   _pub: ffi('int mgos_mqtt_pub(char *, void *, int, int, bool)'),
 
-  // ## **`MQTT.pub(topic, message, qos)`**
-  // Publish message to a topic. QoS defaults to 0.
+  // ## **`MQTT.pub(topic, message, qos, retain)`**
+  // Publish message to a topic. If `qos` is not specified, it defaults to 0.
+  // If `retain` is not specified, it defaults to `false`.
   // Return value: 0 on failure (e.g. no connection to server), 1 on success.
   //
-  // Example - send MQTT message on button press:
+  // Example - send MQTT message on button press, with QoS 1, no retain:
   // ```javascript
   // load('api_mqtt.js');
   // load('api_gpio.js');
   // let pin = 0, topic = 'my/topic';
   // GPIO.set_button_handler(pin, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, function() {
-  //   let res = MQTT.pub('my/topic', JSON.stringify({ a: 1, b: 2 }), 1, false);
+  //   let res = MQTT.pub('my/topic', JSON.stringify({ a: 1, b: 2 }), 1);
   //   print('Published:', res ? 'yes' : 'no');
   // }, null);
   // ```
