@@ -363,7 +363,9 @@ void mgos_mqtt_sub(const char *topic, sub_handler_t handler, void *user_data) {
   sd->handler = handler;
   sd->user_data = user_data;
   mgos_mqtt_global_subscribe(mg_mk_str(topic), mqttsubtrampoline, sd);
-  if (s_connected) s_conn->flags |= MG_F_CLOSE_IMMEDIATELY;  // Reconnect
+  struct mg_mqtt_topic_expression te = {.topic = topic,.qos = 1};
+  struct mg_connection *nc = mgos_mqtt_get_global_conn();
+  mg_mqtt_subscribe(nc, &te, 1 /* len */, mgos_mqtt_get_packet_id());
 }
 
 size_t mgos_mqtt_num_unsent_bytes(void) {
