@@ -3,8 +3,8 @@
  * All rights reserved
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "mgos_mqtt.h"
 
@@ -22,6 +22,10 @@
 
 #ifndef MGOS_MQTT_LOG_PUSHBACK_THRESHOLD
 #define MGOS_MQTT_LOG_PUSHBACK_THRESHOLD 2048
+#endif
+
+#ifndef MGOS_MQTT_SUBSCRIBE_QOS
+#define MGOS_MQTT_SUBSCRIBE_QOS 1
 #endif
 
 struct topic_handler {
@@ -85,6 +89,13 @@ static void call_global_handlers(struct mg_connection *nc, int ev,
   (void) user_data;
 }
 
+static void do_subscribe(struct topic_handler *th) {
+  struct mg_mqtt_topic_expression te = {.topic = th->topic.p, .qos = th->qos};
+  th->sub_id = mgos_mqtt_get_packet_id();
+  mg_mqtt_subscribe(mgos_mqtt_get_global_conn(), &te, 1, th->sub_id);
+  LOG(LL_INFO, ("Subscribing to '%s'", te.topic));
+}
+
 static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
                          void *user_data) {
   if (ev > MG_MQTT_EVENT_BASE) {
@@ -146,11 +157,7 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
         s_reconnect_timeout_ms = 0;
         call_global_handlers(nc, ev, ev_data, user_data);
         SLIST_FOREACH(th, &s_topic_handlers, entries) {
-          struct mg_mqtt_topic_expression te = {.topic = th->topic.p,
-                                                .qos = th->qos};
-          th->sub_id = mgos_mqtt_get_packet_id();
-          mg_mqtt_subscribe(nc, &te, 1 /* len */, th->sub_id);
-          LOG(LL_INFO, ("Subscribing to '%s'", te.topic));
+          do_subscribe(th);
         }
       } else {
         nc->flags |= MG_F_CLOSE_IMMEDIATELY;
@@ -190,8 +197,9 @@ void mgos_mqtt_global_subscribe(const struct mg_str topic,
   th->topic.len = topic.len;
   th->handler = handler;
   th->user_data = ud;
-  th->qos = 1;
+  th->qos = MGOS_MQTT_SUBSCRIBE_QOS;
   SLIST_INSERT_HEAD(&s_topic_handlers, th, entries);
+  if (s_connected) do_subscribe(th);
 }
 
 void mgos_mqtt_add_global_handler(mg_event_handler_t handler, void *ud) {
@@ -363,7 +371,6 @@ void mgos_mqtt_sub(const char *topic, sub_handler_t handler, void *user_data) {
   sd->handler = handler;
   sd->user_data = user_data;
   mgos_mqtt_global_subscribe(mg_mk_str(topic), mqttsubtrampoline, sd);
-  if (s_connected) s_conn->flags |= MG_F_CLOSE_IMMEDIATELY;  // Reconnect
 }
 
 size_t mgos_mqtt_num_unsent_bytes(void) {
