@@ -49,11 +49,21 @@ static struct mg_connection *s_conn = NULL;
 static bool s_connected = false;
 static mgos_mqtt_auth_callback_t s_auth_cb = NULL;
 static void *s_auth_cb_arg = NULL;
+static int s_max_qos = 2;
 
 SLIST_HEAD(topic_handlers, topic_handler) s_topic_handlers;
 SLIST_HEAD(global_handlers, global_handler) s_global_handlers;
 
 static void mqtt_global_reconnect(void);
+
+void mgos_mqtt_set_max_qos(int qos) {
+  LOG(LL_INFO, ("Setting max MQTT QOS to %d", qos));
+  s_max_qos = qos;
+}
+
+static int adjust_qos(int qos) {
+  return s_max_qos < qos ? s_max_qos : qos;
+}
 
 uint16_t mgos_mqtt_get_packet_id(void) {
   static uint16_t s_packet_id = 0;
@@ -90,7 +100,8 @@ static void call_global_handlers(struct mg_connection *nc, int ev,
 }
 
 static void do_subscribe(struct topic_handler *th) {
-  struct mg_mqtt_topic_expression te = {.topic = th->topic.p, .qos = th->qos};
+  struct mg_mqtt_topic_expression te = {.topic = th->topic.p,
+                                        .qos = adjust_qos(th->qos)};
   th->sub_id = mgos_mqtt_get_packet_id();
   mg_mqtt_subscribe(mgos_mqtt_get_global_conn(), &te, 1, th->sub_id);
   LOG(LL_INFO, ("Subscribing to '%s'", te.topic));
@@ -197,7 +208,7 @@ void mgos_mqtt_global_subscribe(const struct mg_str topic,
   th->topic.len = topic.len;
   th->handler = handler;
   th->user_data = ud;
-  th->qos = MGOS_MQTT_SUBSCRIBE_QOS;
+  th->qos = adjust_qos(MGOS_MQTT_SUBSCRIBE_QOS);
   SLIST_INSERT_HEAD(&s_topic_handlers, th, entries);
   if (s_connected) do_subscribe(th);
 }
@@ -342,7 +353,7 @@ struct mg_connection *mgos_mqtt_get_global_conn(void) {
 bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                    bool retain) {
   struct mg_connection *c = mgos_mqtt_get_global_conn();
-  int flags = MG_MQTT_QOS(qos);
+  int flags = MG_MQTT_QOS(adjust_qos(qos));
   if (retain) flags |= MG_MQTT_RETAIN;
   if (c == NULL || !s_connected) return false;
   LOG(LL_DEBUG, ("Publishing to %s @ %d%s (%d): [%.*s]", topic, qos,

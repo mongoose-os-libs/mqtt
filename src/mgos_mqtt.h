@@ -75,6 +75,15 @@ size_t mgos_mqtt_num_unsent_bytes(void);
 
 uint16_t mgos_mqtt_get_packet_id(void);
 
+/*
+ * Set maximum QOS level that is supported by server: 0, 1 or 2.
+ * Some servers, particularly AWS GreenGrass, accept only QoS0 transactions.
+ * An attempt to use any other QoS results into silent disconnect.
+ * Therefore, instead of forcing all client code to track such server's quirks,
+ * we add mechanism to transparently downgrade the QoS.
+ */
+void mgos_mqtt_set_max_qos(int qos);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
