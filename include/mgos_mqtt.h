@@ -3,6 +3,13 @@
  * All rights reserved
  */
 
+/*
+ * MQTT API.
+ *
+ * See https://mongoose-os.com/blog/why-mqtt-is-getting-so-popular-in-iot/
+ * for some background information.
+ */
+
 #ifndef CS_FW_SRC_MGOS_MQTT_H_
 #define CS_FW_SRC_MGOS_MQTT_H_
 
