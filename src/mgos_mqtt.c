@@ -57,6 +57,7 @@ SLIST_HEAD(global_handlers, global_handler) s_global_handlers;
 static void mqtt_global_reconnect(void);
 
 void mgos_mqtt_set_max_qos(int qos) {
+  if (s_max_qos == qos) return;
   LOG(LL_INFO, ("Setting max MQTT QOS to %d", qos));
   s_max_qos = qos;
 }
@@ -282,6 +283,8 @@ bool mgos_mqtt_init(void) {
     return false;
   }
   mgos_net_add_event_handler(mgos_mqtt_net_ev, NULL);
+
+  mgos_mqtt_set_max_qos(mgos_sys_config_get_mqtt_max_qos());
 
   mgos_hook_register(MGOS_HOOK_DEBUG_WRITE, s_debug_write_hook, NULL);
 
