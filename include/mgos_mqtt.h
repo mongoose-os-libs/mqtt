@@ -39,13 +39,14 @@ void mgos_mqtt_global_subscribe(const struct mg_str topic,
 void mgos_mqtt_add_global_handler(mg_event_handler_t handler, void *ud);
 
 /*
- * Set authentication callback. It is invoked when CONNECT message is about to
- * be sent, values from *user and *pass, if non-NULL, will be sent along.
- * Note: *user and *pass must be heap-allocated and will be free()d.
+ * Set connect callback. It is invoked when CONNECT message is about to
+ * be sent. The callback is responsible to call `mg_send_mqtt_handshake_opt()`
  */
-typedef void (*mgos_mqtt_auth_callback_t)(char **client_id, char **user,
-                                          char **pass, void *arg);
-void mgos_mqtt_set_auth_callback(mgos_mqtt_auth_callback_t cb, void *cb_arg);
+typedef void (*mgos_mqtt_connect_fn_t)(struct mg_connection *c,
+                                       const char *client_id,
+                                       struct mg_send_mqtt_handshake_opts *opts,
+                                       void *fn_arg);
+void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t cb, void *fn_arg);
 
 /*
  * Returns current MQTT connection if it is established; otherwise returns

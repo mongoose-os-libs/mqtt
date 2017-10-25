@@ -47,8 +47,8 @@ static int s_reconnect_timeout_ms = 0;
 static mgos_timer_id s_reconnect_timer_id = MGOS_INVALID_TIMER_ID;
 static struct mg_connection *s_conn = NULL;
 static bool s_connected = false;
-static mgos_mqtt_auth_callback_t s_auth_cb = NULL;
-static void *s_auth_cb_arg = NULL;
+static mgos_mqtt_connect_fn_t s_connect_fn = NULL;
+static void *s_connect_fn_arg = NULL;
 static int s_max_qos = 2;
 
 SLIST_HEAD(topic_handlers, topic_handler) s_topic_handlers;
@@ -121,30 +121,23 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       if (!success) break;
       struct mg_send_mqtt_handshake_opts opts;
       memset(&opts, 0, sizeof(opts));
-      char *cb_client_id = NULL, *cb_user = NULL, *cb_pass = NULL;
-      if (s_auth_cb != NULL) {
-        s_auth_cb(&cb_client_id, &cb_user, &cb_pass, s_auth_cb_arg);
-        opts.user_name = cb_user;
-        opts.password = cb_pass;
-      } else {
-        opts.user_name = mgos_sys_config_get_mqtt_user();
-        opts.password = mgos_sys_config_get_mqtt_pass();
-      }
+      // char *cb_client_id = NULL, *cb_user = NULL, *cb_pass = NULL;
+      opts.user_name = mgos_sys_config_get_mqtt_user();
+      opts.password = mgos_sys_config_get_mqtt_pass();
       if (mgos_sys_config_get_mqtt_clean_session()) {
         opts.flags |= MG_MQTT_CLEAN_SESSION;
       }
       opts.keep_alive = mgos_sys_config_get_mqtt_keep_alive();
       opts.will_topic = mgos_sys_config_get_mqtt_will_topic();
       opts.will_message = mgos_sys_config_get_mqtt_will_message();
-      const char *client_id =
-          (cb_client_id != NULL ? cb_client_id
-                                : (mgos_sys_config_get_mqtt_client_id() != NULL
-                                       ? mgos_sys_config_get_mqtt_client_id()
-                                       : mgos_sys_config_get_device_id()));
-      mg_send_mqtt_handshake_opt(nc, client_id, opts);
-      free(cb_client_id);
-      free(cb_user);
-      free(cb_pass);
+      const char *client_id = (mgos_sys_config_get_mqtt_client_id() != NULL
+                                   ? mgos_sys_config_get_mqtt_client_id()
+                                   : mgos_sys_config_get_device_id());
+      if (s_connect_fn != NULL) {
+        s_connect_fn(nc, client_id, &opts, s_connect_fn_arg);
+      } else {
+        mg_send_mqtt_handshake_opt(nc, client_id, opts);
+      }
       break;
     }
     case MG_EV_CLOSE: {
@@ -220,9 +213,9 @@ void mgos_mqtt_add_global_handler(mg_event_handler_t handler, void *ud) {
   SLIST_INSERT_HEAD(&s_global_handlers, gh, entries);
 }
 
-void mgos_mqtt_set_auth_callback(mgos_mqtt_auth_callback_t cb, void *cb_arg) {
-  s_auth_cb = cb;
-  s_auth_cb_arg = cb_arg;
+void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t fn, void *fn_arg) {
+  s_connect_fn = fn;
+  s_connect_fn_arg = fn_arg;
 }
 
 static void mgos_mqtt_net_ev(enum mgos_net_event ev,
