@@ -116,9 +116,10 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
 
   switch (ev) {
     case MG_EV_CONNECT: {
-      bool success = (*(int *) ev_data == 0);
-      LOG(LL_INFO, ("MQTT Connect (%d)", success));
-      if (!success) break;
+      int status = *((int *) ev_data);
+      LOG(LL_INFO,
+          ("MQTT TCP connect %s (%d)", (status == 0 ? "ok" : "error"), status));
+      if (status != 0) break;
       struct mg_send_mqtt_handshake_opts opts;
       memset(&opts, 0, sizeof(opts));
       // char *cb_client_id = NULL, *cb_user = NULL, *cb_pass = NULL;
