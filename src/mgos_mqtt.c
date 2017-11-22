@@ -19,6 +19,9 @@
 #include "mgos_sys_config.h"
 #include "mgos_timers.h"
 #include "mgos_utils.h"
+#if MGOS_HAVE_PROMETHEUS_METRICS
+#include "mgos_prometheus_metrics.h"
+#endif // MGOS_HAVE_PROMETHEUS_METRICS
 
 #ifndef MGOS_MQTT_LOG_PUSHBACK_THRESHOLD
 #define MGOS_MQTT_LOG_PUSHBACK_THRESHOLD 2048
@@ -27,6 +30,29 @@
 #ifndef MGOS_MQTT_SUBSCRIBE_QOS
 #define MGOS_MQTT_SUBSCRIBE_QOS 1
 #endif
+
+#if MGOS_HAVE_PROMETHEUS_METRICS
+static uint32_t metrics_mqtt_sent_topics_count = 0;
+static uint32_t metrics_mqtt_sent_topics_bytes_total = 0;
+static uint32_t metrics_mqtt_received_topics_count = 0;
+static uint32_t metrics_mqtt_received_topics_bytes_total = 0;
+
+static void metrics_mqtt(struct mg_connection *nc, void *user_data) {
+  mgos_prometheus_metrics_printf(nc, COUNTER, "mgos_mqtt_sent_topics_count", "MQTT topics sent",
+    "%u", metrics_mqtt_sent_topics_count);
+
+  mgos_prometheus_metrics_printf(nc, COUNTER, "mgos_mqtt_sent_topics_bytes_total", "Total bytes sent in MQTT topics",
+    "%u", metrics_mqtt_sent_topics_bytes_total);
+
+  mgos_prometheus_metrics_printf(nc, COUNTER, "mgos_mqtt_received_topics_count", "MQTT topics sent",
+    "%u", metrics_mqtt_received_topics_count);
+
+  mgos_prometheus_metrics_printf(nc, COUNTER, "mgos_mqtt_received_topics_bytes_total", "Total bytes received in MQTT topics",
+    "%u", metrics_mqtt_received_topics_bytes_total);
+
+  (void) user_data;
+}
+#endif // MGOS_HAVE_PROMETHEUS_METRICS
 
 struct topic_handler {
   struct mg_str topic;
@@ -282,6 +308,10 @@ bool mgos_mqtt_init(void) {
 
   mgos_hook_register(MGOS_HOOK_DEBUG_WRITE, s_debug_write_hook, NULL);
 
+#if MGOS_HAVE_PROMETHEUS_METRICS
+  mgos_prometheus_metrics_add_handler(metrics_mqtt, NULL);
+#endif
+
   return true;
 }
 
@@ -363,6 +393,10 @@ bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                  (retain ? " (RETAIN)" : ""), (int) len, (int) len,
                  (const char *) message));
   mg_mqtt_publish(c, topic, mgos_mqtt_get_packet_id(), flags, message, len);
+#if MGOS_HAVE_PROMETHEUS_METRICS
+  metrics_mqtt_sent_topics_count++;
+  metrics_mqtt_sent_topics_bytes_total+=len;
+#endif // MGOS_HAVE_PROMETHEUS_METRICS
   return true;
 }
 
@@ -378,6 +412,10 @@ static void mqttsubtrampoline(struct mg_connection *c, int ev, void *ev_data,
   struct mg_mqtt_message *mm = (struct mg_mqtt_message *) ev_data;
   sd->handler(c, mm->topic.p, mm->topic.len, mm->payload.p, mm->payload.len,
               sd->user_data);
+#if MGOS_HAVE_PROMETHEUS_METRICS
+  metrics_mqtt_received_topics_count++;
+  metrics_mqtt_received_topics_bytes_total+=mm->topic.len;
+#endif // MGOS_HAVE_PROMETHEUS_METRICS
 }
 
 void mgos_mqtt_sub(const char *topic, sub_handler_t handler, void *user_data) {
