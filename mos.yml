@@ -27,6 +27,7 @@ config_schema:
   - ["mqtt.will_topic", "s", "", {title: "Will topic"}]
   - ["mqtt.will_message", "s", "", {title: "Will message"}]
   - ["mqtt.max_qos", "i", 2, {title: "Limit QoS of outgoing messages to at most this"}]
+  - ["mqtt.recv_mbuf_limit", "i", 3072, {title: "Limit recv buffer size"}]
   - ["debug.stdout_topic", "s", "", {title: "MQTT topic to publish STDOUT to"}]
   - ["debug.stderr_topic", "s", "", {title: "MQTT topic to publish STDERR to"}]
 cdefs:

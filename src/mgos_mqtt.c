@@ -313,6 +313,7 @@ bool mgos_mqtt_global_connect(void) {
                           NULL, opts);
   if (s_conn != NULL) {
     mg_set_protocol_mqtt(s_conn);
+    s_conn->recv_mbuf_limit = mgos_sys_config_get_mqtt_recv_mbuf_limit();
   } else {
     ret = false;
   }
