@@ -128,6 +128,9 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       if (mgos_sys_config_get_mqtt_clean_session()) {
         opts.flags |= MG_MQTT_CLEAN_SESSION;
       }
+      if (mgos_sys_config_get_mqtt_will_retain()) {
+        opts.flags |= MG_MQTT_WILL_RETAIN;
+      }
       opts.keep_alive = mgos_sys_config_get_mqtt_keep_alive();
       opts.will_topic = mgos_sys_config_get_mqtt_will_topic();
       opts.will_message = mgos_sys_config_get_mqtt_will_message();
