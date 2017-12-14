@@ -12,7 +12,8 @@
 #include "common/mg_str.h"
 #include "common/platform.h"
 #include "common/queue.h"
-#include "mgos_hooks.h"
+#include "mgos_debug.h"
+#include "mgos_event.h"
 #include "mgos_mdns.h"
 #include "mgos_mongoose.h"
 #include "mgos_net.h"
@@ -229,31 +230,29 @@ static void mgos_mqtt_net_ev(enum mgos_net_event ev,
   (void) arg;
 }
 
-static void s_debug_write_hook(enum mgos_hook_type type,
-                               const struct mgos_hook_arg *arg,
-                               void *userdata) {
+static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
+  struct mgos_debug_hook_arg *arg = (struct mgos_debug_hook_arg *) ev_data;
   const char *topic =
-      (arg->debug.fd == 1
+      (arg->fd == 1
            ? mgos_sys_config_get_debug_stdout_topic()
-           : arg->debug.fd == 2 ? mgos_sys_config_get_debug_stderr_topic()
-                                : NULL);
+           : arg->fd == 2 ? mgos_sys_config_get_debug_stderr_topic() : NULL);
   if (topic != NULL &&
       mgos_mqtt_num_unsent_bytes() < MGOS_MQTT_LOG_PUSHBACK_THRESHOLD) {
     static uint32_t s_seq = 0;
-    char *msg = arg->debug.buf;
+    char *msg = arg->buf;
     int msg_len = mg_asprintf(
         &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
         (mgos_sys_config_get_device_id() ? mgos_sys_config_get_device_id()
                                          : "-"),
-        s_seq, mg_time(), arg->debug.fd, (int) arg->debug.len, arg->debug.data);
-    if (arg->debug.len > 0) {
+        s_seq, mg_time(), arg->fd, (int) arg->len, arg->data);
+    if (arg->len > 0) {
       mgos_mqtt_pub(topic, msg, msg_len, 0 /* qos */, false);
       s_seq++;
     }
-    if (msg != arg->debug.buf) free(msg);
+    if (msg != arg->buf) free(msg);
   }
 
-  (void) type;
+  (void) ev;
   (void) userdata;
 }
 
@@ -280,7 +279,7 @@ bool mgos_mqtt_init(void) {
 
   mgos_mqtt_set_max_qos(mgos_sys_config_get_mqtt_max_qos());
 
-  mgos_hook_register(MGOS_HOOK_DEBUG_WRITE, s_debug_write_hook, NULL);
+  mgos_event_add_handler(MGOS_EVENT_LOG, s_debug_write_cb, NULL);
 
   return true;
 }
