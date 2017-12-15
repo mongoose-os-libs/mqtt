@@ -1,7 +1,7 @@
 let MQTT = {
   _sub: ffi('void mgos_mqtt_sub(char *, void (*)(void *, void *, int, void *, int, userdata), userdata)'),
   _subf: function(conn, topic, len1, msg, len2, ud) {
-    return ud.cb(conn, fstr(topic, len1), fstr(msg, len2), ud.ud);
+    return ud.cb(conn, mkstr(topic, len1), mkstr(msg, len2), ud.ud);
   },
 
   // ## **`MQTT.sub(topic, handler)`**
