@@ -23,9 +23,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/* Initialises global MQTT connection */
-bool mgos_mqtt_init(void);
-
 /*
  * Subscribe to a specific topic.
  * This handler will receive SUBACK - when first subscribed to the topic,
@@ -39,13 +36,18 @@ void mgos_mqtt_global_subscribe(const struct mg_str topic,
 void mgos_mqtt_add_global_handler(mg_event_handler_t handler, void *ud);
 
 /*
- * Set connect callback. It is invoked when CONNECT message is about to
- * be sent. The callback is responsible to call `mg_send_mqtt_handshake_opt()`
+ * Callback signature for `mgos_mqtt_set_connect_fn()`, see its docs for
+ * details.
  */
 typedef void (*mgos_mqtt_connect_fn_t)(struct mg_connection *c,
                                        const char *client_id,
                                        struct mg_send_mqtt_handshake_opts *opts,
                                        void *fn_arg);
+
+/*
+ * Set connect callback. It is invoked when CONNECT message is about to
+ * be sent. The callback is responsible to call `mg_send_mqtt_handshake_opt()`
+ */
 void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t cb, void *fn_arg);
 
 /*
@@ -71,6 +73,9 @@ bool mgos_mqtt_global_connect(void);
 bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                    bool retain);
 
+/*
+ * Callback signature for `mgos_mqtt_sub()` below.
+ */
 typedef void (*sub_handler_t)(struct mg_connection *nc, const char *topic,
                               int topic_len, const char *msg, int msg_len,
                               void *ud);
@@ -79,8 +84,15 @@ typedef void (*sub_handler_t)(struct mg_connection *nc, const char *topic,
  */
 void mgos_mqtt_sub(const char *topic, sub_handler_t, void *ud);
 
+/*
+ * Returns number of pending bytes to send.
+ */
 size_t mgos_mqtt_num_unsent_bytes(void);
 
+/*
+ * Returns next packet id; the returned value is incremented every time the
+ * function is called, and it's never 0 (so after 0xffff it'll be 1)
+ */
 uint16_t mgos_mqtt_get_packet_id(void);
 
 /*
