@@ -220,13 +220,11 @@ void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t fn, void *fn_arg) {
   s_connect_fn_arg = fn_arg;
 }
 
-static void mgos_mqtt_net_ev(enum mgos_net_event ev,
-                             const struct mgos_net_event_data *ev_data,
-                             void *arg) {
+static void mgos_mqtt_net_ev(int ev, void *evd, void *arg) {
   if (ev != MGOS_NET_EV_IP_ACQUIRED) return;
 
   mgos_mqtt_global_connect();
-  (void) ev_data;
+  (void) evd;
   (void) arg;
 }
 
@@ -275,7 +273,7 @@ bool mgos_mqtt_init(void) {
     LOG(LL_ERROR, ("MQTT requires server name"));
     return false;
   }
-  mgos_net_add_event_handler(mgos_mqtt_net_ev, NULL);
+  mgos_event_add_group_handler(MGOS_EVENT_GRP_NET, mgos_mqtt_net_ev, NULL);
 
   mgos_mqtt_set_max_qos(mgos_sys_config_get_mqtt_max_qos());
 
