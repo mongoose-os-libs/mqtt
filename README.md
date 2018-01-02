@@ -25,7 +25,7 @@ See example video (don't forget to set `mqtt.enable=true` before you try it):
 
 The MQTT library adds `mqtt` section to the device configuration:
 
-```json
+```javascript
 {
   "clean_session": true,        // Clean session info stored on server 
   "client_id": "",              // If not set, device.id is used
