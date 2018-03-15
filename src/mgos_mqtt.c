@@ -14,7 +14,6 @@
 #include "common/queue.h"
 #include "mgos_debug.h"
 #include "mgos_event.h"
-#include "mgos_mdns.h"
 #include "mgos_mongoose.h"
 #include "mgos_net.h"
 #include "mgos_sys_config.h"
