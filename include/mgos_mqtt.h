@@ -30,6 +30,7 @@
 #include "mgos_features.h"
 #include "mgos_init.h"
 #include "mgos_mongoose.h"
+#include "mgos_sys_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -115,6 +116,11 @@ uint16_t mgos_mqtt_get_packet_id(void);
  * we add mechanism to transparently downgrade the QoS.
  */
 void mgos_mqtt_set_max_qos(int qos);
+
+/*
+ * (Re)configure MQTT.
+ */
+bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg);
 
 #ifdef __cplusplus
 }
