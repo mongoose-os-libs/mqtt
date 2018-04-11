@@ -92,7 +92,7 @@ static bool call_topic_handler(struct mg_connection *nc, int ev, void *ev_data,
   SLIST_FOREACH(th, &s_topic_handlers, entries) {
     if ((ev == MG_EV_MQTT_SUBACK && th->sub_id == msg->message_id) ||
         mg_mqtt_match_topic_expression(th->topic, msg->topic)) {
-      if (ev == MG_EV_MQTT_PUBLISH && th->qos > 0) {
+      if (ev == MG_EV_MQTT_PUBLISH && msg->qos > 0) {
         mg_mqtt_puback(nc, msg->message_id);
       }
       th->handler(nc, ev, ev_data, th->user_data);
