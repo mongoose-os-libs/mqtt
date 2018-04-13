@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
+#include "mgos_mqtt.h"
+
 #include <stdbool.h>
 #include <stdlib.h>
-
-#include "mgos_mqtt.h"
 
 #include "common/cs_dbg.h"
 #include "common/mg_str.h"
 #include "common/platform.h"
 #include "common/queue.h"
+#include "frozen.h"
 #include "mgos_debug.h"
 #include "mgos_event.h"
 #include "mgos_mongoose.h"
@@ -434,6 +435,27 @@ bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                  (const char *) message));
   mg_mqtt_publish(c, topic, mgos_mqtt_get_packet_id(), flags, message, len);
   return true;
+}
+
+bool mgos_mqtt_pubf(const char *topic, int qos, bool retain,
+                    const char *json_fmt, ...) {
+  bool res;
+  va_list ap;
+  va_start(ap, json_fmt);
+  res = mgos_mqtt_pubv(topic, qos, retain, json_fmt, ap);
+  va_end(ap);
+  return res;
+}
+
+bool mgos_mqtt_pubv(const char *topic, int qos, bool retain,
+                    const char *json_fmt, va_list ap) {
+  bool res = false;
+  char *msg = json_vasprintf(json_fmt, ap);
+  if (msg != NULL) {
+    res = mgos_mqtt_pub(topic, msg, strlen(msg), qos, retain);
+    free(msg);
+  }
+  return res;
 }
 
 struct sub_data {

@@ -25,6 +25,7 @@
 #ifndef CS_FW_SRC_MGOS_MQTT_H_
 #define CS_FW_SRC_MGOS_MQTT_H_
 
+#include <stdarg.h>
 #include <stdbool.h>
 
 #include "mgos_features.h"
@@ -85,6 +86,12 @@ bool mgos_mqtt_global_connect(void);
  */
 bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                    bool retain);
+
+/* Variant of mgos_mqtt_pub for publishing a JSON-formatted string */
+bool mgos_mqtt_pubf(const char *topic, int qos, bool retain,
+                    const char *json_fmt, ...);
+bool mgos_mqtt_pubv(const char *topic, int qos, bool retain,
+                    const char *json_fmt, va_list ap);
 
 /*
  * Callback signature for `mgos_mqtt_sub()` below.
