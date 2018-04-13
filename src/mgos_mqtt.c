@@ -384,6 +384,7 @@ bool mgos_mqtt_global_connect(void) {
     mg_set_protocol_mqtt(s_conn);
     s_conn->recv_mbuf_limit = s_cfg->recv_mbuf_limit;
   } else {
+    mqtt_global_reconnect();
     ret = false;
   }
   return ret;
@@ -391,9 +392,7 @@ bool mgos_mqtt_global_connect(void) {
 
 static void reconnect_timer_cb(void *user_data) {
   s_reconnect_timer_id = MGOS_INVALID_TIMER_ID;
-  if (!mgos_mqtt_global_connect()) {
-    mqtt_global_reconnect();
-  }
+  mgos_mqtt_global_connect();
   (void) user_data;
 }
 
