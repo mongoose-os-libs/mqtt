@@ -127,6 +127,7 @@ void mgos_mqtt_set_max_qos(int qos);
 /*
  * (Re)configure MQTT.
  */
+struct mgos_config_mqtt;
 bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg);
 
 #ifdef __cplusplus
