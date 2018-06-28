@@ -253,7 +253,8 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
         &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
         (mgos_sys_config_get_device_id() ? mgos_sys_config_get_device_id()
                                          : "-"),
-        s_seq, mg_time(), arg->fd, (int) arg->len, (const char *) arg->data);
+        (unsigned int) s_seq, mg_time(), arg->fd, (int) arg->len,
+        (const char *) arg->data);
     if (arg->len > 0) {
       mgos_mqtt_pub(topic, msg, msg_len, 0 /* qos */, false);
       s_seq++;
