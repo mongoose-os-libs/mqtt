@@ -62,7 +62,8 @@ static struct mg_connection *s_conn = NULL;
 static bool s_connected = false;
 static mgos_mqtt_connect_fn_t s_connect_fn = NULL;
 static void *s_connect_fn_arg = NULL;
-static struct mgos_config_mqtt *s_cfg = NULL;
+static const struct mgos_config_mqtt *s_cfg = NULL;
+static int s_max_qos = -1;
 
 SLIST_HEAD(topic_handlers, topic_handler) s_topic_handlers;
 SLIST_HEAD(global_handlers, global_handler) s_global_handlers;
@@ -72,11 +73,14 @@ static void mqtt_global_reconnect(void);
 void mgos_mqtt_set_max_qos(int qos) {
   if (s_cfg == NULL || s_cfg->max_qos == qos) return;
   LOG(LL_INFO, ("Setting max MQTT QOS to %d", qos));
-  s_cfg->max_qos = qos;
+  s_max_qos = qos;
 }
 
 static int adjust_qos(int qos) {
-  return s_cfg != NULL && s_cfg->max_qos < qos ? s_cfg->max_qos : qos;
+  int max_qos = s_max_qos;
+  if (max_qos < 0 && s_cfg != NULL) max_qos = s_cfg->max_qos;
+  if (max_qos < 0) return qos;
+  return MIN(qos, max_qos);
 }
 
 uint16_t mgos_mqtt_get_packet_id(void) {
@@ -123,10 +127,13 @@ static void do_subscribe(struct topic_handler *th) {
 
 static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
                          void *user_data) {
+  if (nc != s_conn) {
+    nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+    return;
+  }
   if (ev > MG_MQTT_EVENT_BASE) {
     LOG(LL_DEBUG, ("MQTT event: %d", ev));
   }
-
   switch (ev) {
     case MG_EV_CONNECT: {
       int status = *((int *) ev_data);
@@ -279,6 +286,7 @@ static void mgos_mqtt_free_config(struct mgos_config_mqtt *cfg) {
   free(cfg->will_topic);
   free(cfg->will_message);
   memset(cfg, 0, sizeof(*cfg));
+  free(cfg);
 }
 
 bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
@@ -295,13 +303,7 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   new_cfg = (struct mgos_config_mqtt *) calloc(1, sizeof(*new_cfg));
   if (new_cfg == NULL) goto out;
   new_cfg->enable = cfg->enable;
-  if (strchr(cfg->server, ':') == NULL) {
-    int port = (cfg->ssl_ca_cert != NULL ? 8883 : 1883);
-    mg_asprintf(&new_cfg->server, 0, "%s:%d", cfg->server, port);
-    if (new_cfg->server == NULL) goto out;
-  } else {
-    new_cfg->server = strdup(cfg->server);
-  }
+  new_cfg->server = strdup(cfg->server);
   if (cfg->client_id) new_cfg->client_id = strdup(cfg->client_id);
   if (cfg->user) new_cfg->user = strdup(cfg->user);
   if (cfg->pass) new_cfg->pass = strdup(cfg->pass);
@@ -310,10 +312,12 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   if (cfg->ssl_cert) new_cfg->ssl_cert = strdup(cfg->ssl_cert);
   if (cfg->ssl_key) new_cfg->ssl_key = strdup(cfg->ssl_key);
   if (cfg->ssl_ca_cert) new_cfg->ssl_ca_cert = strdup(cfg->ssl_ca_cert);
-  if (cfg->ssl_cipher_suites)
+  if (cfg->ssl_cipher_suites) {
     new_cfg->ssl_cipher_suites = strdup(cfg->ssl_cipher_suites);
-  if (cfg->ssl_psk_identity)
+  }
+  if (cfg->ssl_psk_identity) {
     new_cfg->ssl_psk_identity = strdup(cfg->ssl_psk_identity);
+  }
   if (cfg->ssl_psk_key) new_cfg->ssl_psk_key = strdup(cfg->ssl_psk_key);
   new_cfg->clean_session = cfg->clean_session;
   new_cfg->keep_alive = cfg->keep_alive;
@@ -326,14 +330,20 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
 
 out:
   if (ret) {
+    const struct mgos_config_mqtt *old_cfg = s_cfg;
     s_cfg = new_cfg;
     if (s_conn != NULL) {
       s_conn->flags |= MG_F_CLOSE_IMMEDIATELY;
       s_conn = NULL;
     }
+    const struct mgos_config_mqtt *cfg0 = mgos_sys_config_get_mqtt();
+    const struct mgos_config_mqtt *cfg1 =
+        (const struct mgos_config_mqtt *) mgos_sys_config_get_mqtt1();
+    if (old_cfg != NULL && old_cfg != cfg0 && old_cfg != cfg1) {
+      mgos_mqtt_free_config((struct mgos_config_mqtt *) old_cfg);
+    }
   } else {
     mgos_mqtt_free_config(new_cfg);
-    free(new_cfg);
   }
   return ret;
 }
@@ -355,15 +365,19 @@ bool mgos_mqtt_init(void) {
   mgos_event_add_group_handler(MGOS_EVENT_GRP_NET, mgos_mqtt_net_ev, NULL);
   mgos_event_add_handler(MGOS_EVENT_LOG, s_debug_write_cb, NULL);
 
-  return mgos_mqtt_set_config(mgos_sys_config_get_mqtt());
+  s_cfg = mgos_sys_config_get_mqtt();
+  return true;
 }
 
 bool mgos_mqtt_global_connect(void) {
   bool ret = true;
+  char *server = NULL;
   struct mg_mgr *mgr = mgos_get_mgr();
   struct mg_connect_opts opts;
 
-  if (s_cfg == NULL || !s_cfg->enable) return false;
+  if (s_cfg == NULL || !s_cfg->enable || s_cfg->server == NULL) {
+    return false;
+  }
 
   /* If we're already connected, do nothing */
   if (s_conn != NULL) return true;
@@ -377,10 +391,17 @@ bool mgos_mqtt_global_connect(void) {
   opts.ssl_psk_identity = s_cfg->ssl_psk_identity;
   opts.ssl_psk_key = s_cfg->ssl_psk_key;
 #endif
-  LOG(LL_INFO, ("MQTT connecting to %s", s_cfg->server));
+  if (strchr(s_cfg->server, ':') == NULL) {
+    int port = (s_cfg->ssl_ca_cert != NULL ? 8883 : 1883);
+    mg_asprintf(&server, 0, "%s:%d", s_cfg->server, port);
+    if (server == NULL) return false;
+  } else {
+    server = strdup(s_cfg->server);
+  }
+  LOG(LL_INFO, ("MQTT connecting to %s", server));
 
   s_connected = false;
-  s_conn = mg_connect_opt(mgr, s_cfg->server, mgos_mqtt_ev, NULL, opts);
+  s_conn = mg_connect_opt(mgr, server, mgos_mqtt_ev, NULL, opts);
   if (s_conn != NULL) {
     mg_set_protocol_mqtt(s_conn);
     s_conn->recv_mbuf_limit = s_cfg->recv_mbuf_limit;
@@ -388,6 +409,7 @@ bool mgos_mqtt_global_connect(void) {
     mqtt_global_reconnect();
     ret = false;
   }
+  free(server);
   return ret;
 }
 
@@ -397,11 +419,35 @@ static void reconnect_timer_cb(void *user_data) {
   (void) user_data;
 }
 
+static void mqtt_switch_config(void) {
+  const struct mgos_config_mqtt *cfg0 = mgos_sys_config_get_mqtt();
+  const struct mgos_config_mqtt *cfg1 =
+      (const struct mgos_config_mqtt *) mgos_sys_config_get_mqtt1();
+  const struct mgos_config_mqtt *cfg;
+  if (s_cfg == cfg0) {
+    cfg = cfg1;
+  } else if (s_cfg == cfg1) {
+    cfg = cfg0;
+  } else {
+    /* User set a custom config - don't mess with it. */
+    return;
+  }
+  if (cfg->enable) {
+    s_cfg = cfg;
+    s_reconnect_timeout_ms = s_cfg->reconnect_timeout_min * 1000;
+  }
+}
+
 static void mqtt_global_reconnect(void) {
   int rt_ms;
   if (s_cfg == NULL || s_cfg->server == NULL) return;
 
-  if (s_reconnect_timeout_ms <= 0) s_reconnect_timeout_ms = 1;
+  if (s_reconnect_timeout_ms >= s_cfg->reconnect_timeout_max * 1000) {
+    mqtt_switch_config();
+  }
+
+  if (s_reconnect_timeout_ms <= 0) s_reconnect_timeout_ms = 1000;
+
   rt_ms = s_reconnect_timeout_ms * 2;
 
   if (rt_ms < s_cfg->reconnect_timeout_min * 1000) {
@@ -410,13 +456,11 @@ static void mqtt_global_reconnect(void) {
   if (rt_ms > s_cfg->reconnect_timeout_max * 1000) {
     rt_ms = s_cfg->reconnect_timeout_max * 1000;
   }
+  s_reconnect_timeout_ms = rt_ms;
   /* Fuzz the time a little. */
   rt_ms = (int) mgos_rand_range(rt_ms * 0.9, rt_ms * 1.1);
   LOG(LL_INFO, ("MQTT connecting after %d ms", rt_ms));
-  s_reconnect_timeout_ms = rt_ms;
-  if (s_reconnect_timer_id != MGOS_INVALID_TIMER_ID) {
-    mgos_clear_timer(s_reconnect_timer_id);
-  }
+  mgos_clear_timer(s_reconnect_timer_id);
   s_reconnect_timer_id = mgos_set_timer(rt_ms, 0, reconnect_timer_cb, NULL);
 }
 

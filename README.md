@@ -1,6 +1,6 @@
-# Generic MQTT server
+# Generic MQTT client
 
-This library provides [MQTT protocol](https://en.wikipedia.org/wiki/MQTT)
+This library provides [MQTT protocol](https://en.wikipedia.org/wiki/MQTT) client
 API that allows devices to talk to MQTT servers.
 
 Mongoose OS implements MQTT 3.1.1 client functionality, and works with
@@ -32,9 +32,10 @@ The MQTT library adds `mqtt` section to the device configuration:
   "enable": false,              // Enable MQTT functionality
   "keep_alive": 60,             // How often to send PING messages in seconds
   "pass": "",                   // User password
-  "reconnect_timeout_max": 60,  // Maximum reconnection timeout in seconds
   "reconnect_timeout_min": 2,   // Minimum reconnection timeout in seconds
-  "server": "iot.eclipse.org:1883",    // SERVER:PORT to connect to
+  "reconnect_timeout_max": 60,  // Maximum reconnection timeout in seconds
+  "server": "iot.eclipse.org",  // Server to connect to. if `:PORT` is not specified,
+                                // 1883 or 8883 is used depending on whether SSL is enabled.
   "ssl_ca_cert": "",            // Set this to file name with CA certs to enable TLS
   "ssl_cert": "",               // Client certificate for mutual TLS
   "ssl_cipher_suites": "",      // TLS cipher suites
@@ -46,3 +47,18 @@ The MQTT library adds `mqtt` section to the device configuration:
   "will_topic": ""              // MQTT last will topic
 }
 ```
+
+## Reconnect behavior and backup server
+
+It is possible to have a "backup" server that device will connect to if it fails to connect to the primary server.
+
+Backup server is configured under the `mqtt1` section which contains exactly the same parameters as `mqtt` described above.
+
+Device will first try to connect to the main server configured under `mqtt`.
+It will keep connecting to it, increasing the reconnection interval from `reconnect_timeout_min` to `reconnect_timeout_max`.
+Reconnection interval is doubled after each attempt so for values above there will be
+connection attempts after 2, 4, 8, 16, 32 and 60 seconds.
+After reaching the maximum reconnect interval and if `mqtt1.enable` is set, it will switch to the `mqtt1`
+configuration and reset the reconnect interval, so it will try to connect to `mqtt1` the same way.
+If that works, it will stay connected to `mqtt1`. If connection drops, it will try to reconnect to `mqtt1`
+in the same way. If connection to backup server fails, it will go back to the main server and so on.
