@@ -39,6 +39,7 @@ let MQTT = {
   // }, null);
   // ```
   pub: function(t, m, qos, retain) {
+    qos = qos || 0;
     let message = typeof m === "number" ? JSON.stringify( m ) : m;
     return this._pub(t, message, message.length, qos, retain || false);
   },
