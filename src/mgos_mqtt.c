@@ -372,6 +372,7 @@ bool mgos_mqtt_init(void) {
 bool mgos_mqtt_global_connect(void) {
   bool ret = true;
   char *server = NULL;
+  const char *err_str = NULL;
   struct mg_mgr *mgr = mgos_get_mgr();
   struct mg_connect_opts opts;
 
@@ -383,6 +384,7 @@ bool mgos_mqtt_global_connect(void) {
   if (s_conn != NULL) return true;
 
   memset(&opts, 0, sizeof(opts));
+  opts.error_string = &err_str;
 #if MG_ENABLE_SSL
   opts.ssl_cert = s_cfg->ssl_cert;
   opts.ssl_key = s_cfg->ssl_key;
@@ -406,6 +408,7 @@ bool mgos_mqtt_global_connect(void) {
     mg_set_protocol_mqtt(s_conn);
     s_conn->recv_mbuf_limit = s_cfg->recv_mbuf_limit;
   } else {
+    LOG(LL_ERROR, ("Error: %s", err_str));
     mqtt_global_reconnect();
     ret = false;
   }
