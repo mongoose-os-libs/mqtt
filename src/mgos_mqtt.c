@@ -150,6 +150,9 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       opts.keep_alive = s_cfg->keep_alive;
       opts.will_topic = s_cfg->will_topic;
       opts.will_message = s_cfg->will_message;
+	  if (s_cfg->will_retain) {
+		opts.flags |= MG_MQTT_WILL_RETAIN;
+	  }
       const char *client_id =
           (s_cfg->client_id != NULL ? s_cfg->client_id
                                     : mgos_sys_config_get_device_id());
@@ -323,6 +326,7 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   new_cfg->keep_alive = cfg->keep_alive;
   if (cfg->will_topic) new_cfg->will_topic = strdup(cfg->will_topic);
   if (cfg->will_message) new_cfg->will_message = strdup(cfg->will_message);
+  new_cfg->will_retain = cfg->will_retain;
   new_cfg->max_qos = cfg->max_qos;
   new_cfg->recv_mbuf_limit = cfg->recv_mbuf_limit;
 
