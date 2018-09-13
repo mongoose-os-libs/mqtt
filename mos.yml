@@ -60,6 +60,7 @@ tags:
   - c
   - js
   - net
+  - docs:net:MQTT
 
 # Temporary, while root manifest change propagates (2018/03/29).
 libs:
