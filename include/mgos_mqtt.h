@@ -77,6 +77,9 @@ struct mg_connection *mgos_mqtt_get_global_conn(void);
  */
 bool mgos_mqtt_global_connect(void);
 
+/* Returns true if MQTT connection is up, false otherwise. */
+bool mgos_mqtt_global_is_connected(void);
+
 /*
  * Publish message to the configured MQTT server, to the given MQTT topic.
  * Return value will be true if there is a connection to the server and the

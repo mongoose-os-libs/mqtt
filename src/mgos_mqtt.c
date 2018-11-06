@@ -420,6 +420,10 @@ bool mgos_mqtt_global_connect(void) {
   return ret;
 }
 
+bool mgos_mqtt_global_is_connected(void) {
+  return s_connected;
+}
+
 static void reconnect_timer_cb(void *user_data) {
   s_reconnect_timer_id = MGOS_INVALID_TIMER_ID;
   mgos_mqtt_global_connect();

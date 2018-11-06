@@ -4,6 +4,10 @@ let MQTT = {
     return ud.cb(conn, mkstr(topic, len1), mkstr(msg, len2), ud.ud);
   },
 
+  // ## **`MQTT.isConnected()`**
+  // Return value: true if MQTT connection is up, false otherwise.
+  isConnected: ffi('bool mgos_mqtt_global_is_connected()'),
+
   // ## **`MQTT.sub(topic, handler)`**
   // Subscribe to a topic, and call given handler function when message arrives.
   // A handler receives 4 parameters: MQTT connection, topic name,
