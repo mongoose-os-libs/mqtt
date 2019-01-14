@@ -341,8 +341,7 @@ out:
       s_conn = NULL;
     }
     const struct mgos_config_mqtt *cfg0 = mgos_sys_config_get_mqtt();
-    const struct mgos_config_mqtt *cfg1 =
-        (const struct mgos_config_mqtt *) mgos_sys_config_get_mqtt1();
+    const struct mgos_config_mqtt *cfg1 = mgos_sys_config_get_mqtt1();
     if (old_cfg != NULL && old_cfg != cfg0 && old_cfg != cfg1) {
       mgos_mqtt_free_config((struct mgos_config_mqtt *) old_cfg);
     }
