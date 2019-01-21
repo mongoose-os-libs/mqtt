@@ -161,11 +161,13 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       break;
     }
     case MG_EV_CLOSE: {
-      struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
       LOG(LL_INFO, ("MQTT Disconnect"));
-      mgos_event_trigger(MGOS_EVENT_CLOUD_DISCONNECTED, &arg);
       s_conn = NULL;
       s_connected = false;
+      if (s_cfg->cloud_events) {
+        struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+        mgos_event_trigger(MGOS_EVENT_CLOUD_DISCONNECTED, &arg);
+      }
       call_global_handlers(nc, ev, NULL, user_data);
       mqtt_global_reconnect();
       break;
@@ -179,14 +181,16 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       int code = ((struct mg_mqtt_message *) ev_data)->connack_ret_code;
       LOG((code == 0 ? LL_INFO : LL_ERROR), ("MQTT CONNACK %d", code));
       if (code == 0) {
-        struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
         s_connected = true;
         s_reconnect_timeout_ms = 0;
+        if (s_cfg->cloud_events) {
+          struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+          mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTED, &arg);
+        }
         call_global_handlers(nc, ev, ev_data, user_data);
         SLIST_FOREACH(th, &s_topic_handlers, entries) {
           do_subscribe(th);
         }
-        mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTED, &arg);
       } else {
         nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       }
@@ -330,6 +334,7 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   new_cfg->max_qos = cfg->max_qos;
   new_cfg->recv_mbuf_limit = cfg->recv_mbuf_limit;
   new_cfg->require_time = cfg->require_time;
+  new_cfg->cloud_events = cfg->cloud_events;
 
   ret = true;
 

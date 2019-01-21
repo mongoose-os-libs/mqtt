@@ -30,6 +30,7 @@ config_schema:
   - ["mqtt.max_qos", "i", 2, {title: "Limit QoS of outgoing messages to at most this"}]
   - ["mqtt.recv_mbuf_limit", "i", 3072, {title: "Limit recv buffer size"}]
   - ["mqtt.require_time", "b", false, {title: "Only connect if (when) wall time is set"}]
+  - ["mqtt.cloud_events", "b", true, {title: "Trigger cloud events when connected / disconnected"}]
   # Alternative MQTT configuration. If enabled, client will alternate between mqtt and mqtt1
   # when unable to connect.
   - ["mqtt1", "mqtt", {title: "Backup MQTT settings"}]
