@@ -122,7 +122,7 @@ static void do_subscribe(struct topic_handler *th) {
                                         .qos = adjust_qos(th->qos)};
   th->sub_id = mgos_mqtt_get_packet_id();
   mg_mqtt_subscribe(mgos_mqtt_get_global_conn(), &te, 1, th->sub_id);
-  LOG(LL_INFO, ("Subscribing to '%s'", te.topic));
+  LOG(LL_INFO, ("Subscribing to '%s' (QoS %d)", te.topic, te.qos));
 }
 
 static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
