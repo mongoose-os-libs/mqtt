@@ -329,6 +329,7 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   if (cfg->will_message) new_cfg->will_message = strdup(cfg->will_message);
   new_cfg->max_qos = cfg->max_qos;
   new_cfg->recv_mbuf_limit = cfg->recv_mbuf_limit;
+  new_cfg->require_time = cfg->require_time;
 
   ret = true;
 
@@ -349,6 +350,16 @@ out:
     mgos_mqtt_free_config(new_cfg);
   }
   return ret;
+}
+
+static bool mgos_mqtt_time_ok(void) {
+  if (s_cfg == NULL) return false;
+  if (!s_cfg->require_time) return true;
+  if (mg_time() < 1500000000) {
+    LOG(LL_DEBUG, ("Time is not set, not connecting"));
+    return false;
+  }
+  return true;
 }
 
 bool mgos_mqtt_init(void) {
@@ -385,6 +396,11 @@ bool mgos_mqtt_global_connect(void) {
 
   /* If we're already connected, do nothing */
   if (s_conn != NULL) return true;
+
+  if (!mgos_mqtt_time_ok()) {
+    mqtt_global_reconnect();
+    return false;
+  }
 
   memset(&opts, 0, sizeof(opts));
   opts.error_string = &err_str;
