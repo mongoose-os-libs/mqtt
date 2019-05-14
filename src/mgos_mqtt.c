@@ -283,16 +283,16 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
 
 static void mgos_mqtt_free_config(struct mgos_config_mqtt *cfg) {
   if (cfg == NULL) return;
-  free(cfg->server);
-  free(cfg->client_id);
-  free(cfg->user);
-  free(cfg->pass);
-  free(cfg->ssl_cert);
-  free(cfg->ssl_key);
-  free(cfg->ssl_ca_cert);
-  free(cfg->ssl_cipher_suites);
-  free(cfg->will_topic);
-  free(cfg->will_message);
+  free((char *) cfg->server);
+  free((char *) cfg->client_id);
+  free((char *) cfg->user);
+  free((char *) cfg->pass);
+  free((char *) cfg->ssl_cert);
+  free((char *) cfg->ssl_key);
+  free((char *) cfg->ssl_ca_cert);
+  free((char *) cfg->ssl_cipher_suites);
+  free((char *) cfg->will_topic);
+  free((char *) cfg->will_message);
   memset(cfg, 0, sizeof(*cfg));
   free(cfg);
 }
