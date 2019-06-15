@@ -87,13 +87,13 @@ bool mgos_mqtt_global_is_connected(void);
  * not indicate that PUBACK has been received; there is currently no way to
  * check for that.
  */
-bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
+uint16_t mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
                    bool retain);
 
 /* Variant of mgos_mqtt_pub for publishing a JSON-formatted string */
-bool mgos_mqtt_pubf(const char *topic, int qos, bool retain,
+uint16_t mgos_mqtt_pubf(const char *topic, int qos, bool retain,
                     const char *json_fmt, ...);
-bool mgos_mqtt_pubv(const char *topic, int qos, bool retain,
+uint16_t mgos_mqtt_pubv(const char *topic, int qos, bool retain,
                     const char *json_fmt, va_list ap);
 
 /*
