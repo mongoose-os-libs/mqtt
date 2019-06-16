@@ -525,7 +525,7 @@ uint16_t mgos_mqtt_pubf(const char *topic, int qos, bool retain,
 
 uint16_t mgos_mqtt_pubv(const char *topic, int qos, bool retain,
                     const char *json_fmt, va_list ap) {
-  uint16_t res = false;
+  uint16_t res = 0;
   char *msg = json_vasprintf(json_fmt, ap);
   if (msg != NULL) {
     res = mgos_mqtt_pub(topic, msg, strlen(msg), qos, retain);
