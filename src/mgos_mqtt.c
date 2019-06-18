@@ -499,8 +499,8 @@ struct mg_connection *mgos_mqtt_get_global_conn(void) {
   return s_conn;
 }
 
-uint16_t mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
-                   bool retain) {
+uint16_t mgos_mqtt_pub(const char *topic, const void *message, size_t len,
+                       int qos, bool retain) {
   uint16_t packet_id = mgos_mqtt_get_packet_id();
   struct mg_connection *c = mgos_mqtt_get_global_conn();
   int flags = MG_MQTT_QOS(adjust_qos(qos));
@@ -514,7 +514,7 @@ uint16_t mgos_mqtt_pub(const char *topic, const void *message, size_t len, int q
 }
 
 uint16_t mgos_mqtt_pubf(const char *topic, int qos, bool retain,
-                    const char *json_fmt, ...) {
+                        const char *json_fmt, ...) {
   uint16_t res;
   va_list ap;
   va_start(ap, json_fmt);
@@ -524,7 +524,7 @@ uint16_t mgos_mqtt_pubf(const char *topic, int qos, bool retain,
 }
 
 uint16_t mgos_mqtt_pubv(const char *topic, int qos, bool retain,
-                    const char *json_fmt, va_list ap) {
+                        const char *json_fmt, va_list ap) {
   uint16_t res = 0;
   char *msg = json_vasprintf(json_fmt, ap);
   if (msg != NULL) {
