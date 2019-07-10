@@ -248,7 +248,7 @@ void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t fn, void *fn_arg) {
 
 static void mgos_mqtt_net_ev(int ev, void *evd, void *arg) {
   if (ev != MGOS_NET_EV_IP_ACQUIRED) return;
-
+  if (s_reconnect_timeout_ms < 0) return;  // User doesn't want us to reconnect.
   mgos_mqtt_global_connect();
   (void) evd;
   (void) arg;
@@ -402,6 +402,10 @@ bool mgos_mqtt_global_connect(void) {
   /* If we're already connected, do nothing */
   if (s_conn != NULL) return true;
 
+  if (s_reconnect_timeout_ms < 0) {
+    s_reconnect_timeout_ms = 0;
+  }
+
   if (!mgos_mqtt_time_ok()) {
     mqtt_global_reconnect();
     return false;
@@ -440,6 +444,14 @@ bool mgos_mqtt_global_connect(void) {
   return ret;
 }
 
+void mgos_mqtt_global_disconnect(void) {
+  // This will prevent reconnect.
+  s_reconnect_timeout_ms = -1;
+  if (s_conn != NULL) {
+    s_conn->flags |= MG_F_CLOSE_IMMEDIATELY;
+  }
+}
+
 bool mgos_mqtt_global_is_connected(void) {
   return s_connected;
 }
@@ -471,7 +483,9 @@ static void mqtt_switch_config(void) {
 
 static void mqtt_global_reconnect(void) {
   int rt_ms;
-  if (s_cfg == NULL || s_cfg->server == NULL) return;
+  if (s_cfg == NULL || s_cfg->server == NULL || s_reconnect_timeout_ms < 0) {
+    return;
+  }
 
   if (s_reconnect_timeout_ms >= s_cfg->reconnect_timeout_max * 1000) {
     mqtt_switch_config();

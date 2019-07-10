@@ -77,6 +77,12 @@ struct mg_connection *mgos_mqtt_get_global_conn(void);
  */
 bool mgos_mqtt_global_connect(void);
 
+/*
+ * Disconnect from and/or stop trying to connect to MQTT server
+ * until mgos_mqtt_global_connect() is called.
+ */
+void mgos_mqtt_global_disconnect(void);
+
 /* Returns true if MQTT connection is up, false otherwise. */
 bool mgos_mqtt_global_is_connected(void);
 
