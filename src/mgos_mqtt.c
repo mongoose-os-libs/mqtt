@@ -122,7 +122,7 @@ static void do_subscribe(struct topic_handler *th) {
                                         .qos = adjust_qos(th->qos)};
   th->sub_id = mgos_mqtt_get_packet_id();
   mg_mqtt_subscribe(mgos_mqtt_get_global_conn(), &te, 1, th->sub_id);
-  LOG(LL_INFO, ("Subscribing to '%s'", te.topic));
+  LOG(LL_INFO, ("Subscribing to '%s' (QoS %d)", te.topic, te.qos));
 }
 
 static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
@@ -167,6 +167,10 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       LOG(LL_INFO, ("MQTT Disconnect"));
       s_conn = NULL;
       s_connected = false;
+      if (s_cfg->cloud_events) {
+        struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+        mgos_event_trigger(MGOS_EVENT_CLOUD_DISCONNECTED, &arg);
+      }
       call_global_handlers(nc, ev, NULL, user_data);
       mqtt_global_reconnect();
       break;
@@ -182,6 +186,10 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       if (code == 0) {
         s_connected = true;
         s_reconnect_timeout_ms = 0;
+        if (s_cfg->cloud_events) {
+          struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+          mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTED, &arg);
+        }
         call_global_handlers(nc, ev, ev_data, user_data);
         SLIST_FOREACH(th, &s_topic_handlers, entries) {
           do_subscribe(th);
@@ -243,7 +251,7 @@ void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t fn, void *fn_arg) {
 
 static void mgos_mqtt_net_ev(int ev, void *evd, void *arg) {
   if (ev != MGOS_NET_EV_IP_ACQUIRED) return;
-
+  if (s_reconnect_timeout_ms < 0) return;  // User doesn't want us to reconnect.
   mgos_mqtt_global_connect();
   (void) evd;
   (void) arg;
@@ -278,16 +286,16 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
 
 static void mgos_mqtt_free_config(struct mgos_config_mqtt *cfg) {
   if (cfg == NULL) return;
-  free(cfg->server);
-  free(cfg->client_id);
-  free(cfg->user);
-  free(cfg->pass);
-  free(cfg->ssl_cert);
-  free(cfg->ssl_key);
-  free(cfg->ssl_ca_cert);
-  free(cfg->ssl_cipher_suites);
-  free(cfg->will_topic);
-  free(cfg->will_message);
+  free((char *) cfg->server);
+  free((char *) cfg->client_id);
+  free((char *) cfg->user);
+  free((char *) cfg->pass);
+  free((char *) cfg->ssl_cert);
+  free((char *) cfg->ssl_key);
+  free((char *) cfg->ssl_ca_cert);
+  free((char *) cfg->ssl_cipher_suites);
+  free((char *) cfg->will_topic);
+  free((char *) cfg->will_message);
   memset(cfg, 0, sizeof(*cfg));
   free(cfg);
 }
@@ -329,6 +337,8 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg) {
   new_cfg->will_retain = cfg->will_retain;
   new_cfg->max_qos = cfg->max_qos;
   new_cfg->recv_mbuf_limit = cfg->recv_mbuf_limit;
+  new_cfg->require_time = cfg->require_time;
+  new_cfg->cloud_events = cfg->cloud_events;
 
   ret = true;
 
@@ -341,8 +351,7 @@ out:
       s_conn = NULL;
     }
     const struct mgos_config_mqtt *cfg0 = mgos_sys_config_get_mqtt();
-    const struct mgos_config_mqtt *cfg1 =
-        (const struct mgos_config_mqtt *) mgos_sys_config_get_mqtt1();
+    const struct mgos_config_mqtt *cfg1 = mgos_sys_config_get_mqtt1();
     if (old_cfg != NULL && old_cfg != cfg0 && old_cfg != cfg1) {
       mgos_mqtt_free_config((struct mgos_config_mqtt *) old_cfg);
     }
@@ -350,6 +359,16 @@ out:
     mgos_mqtt_free_config(new_cfg);
   }
   return ret;
+}
+
+static bool mgos_mqtt_time_ok(void) {
+  if (s_cfg == NULL) return false;
+  if (!s_cfg->require_time) return true;
+  if (mg_time() < 1500000000) {
+    LOG(LL_DEBUG, ("Time is not set, not connecting"));
+    return false;
+  }
+  return true;
 }
 
 bool mgos_mqtt_init(void) {
@@ -387,6 +406,15 @@ bool mgos_mqtt_global_connect(void) {
   /* If we're already connected, do nothing */
   if (s_conn != NULL) return true;
 
+  if (s_reconnect_timeout_ms < 0) {
+    s_reconnect_timeout_ms = 0;
+  }
+
+  if (!mgos_mqtt_time_ok()) {
+    mqtt_global_reconnect();
+    return false;
+  }
+
   memset(&opts, 0, sizeof(opts));
   opts.error_string = &err_str;
 #if MG_ENABLE_SSL
@@ -420,6 +448,18 @@ bool mgos_mqtt_global_connect(void) {
   return ret;
 }
 
+void mgos_mqtt_global_disconnect(void) {
+  // This will prevent reconnect.
+  s_reconnect_timeout_ms = -1;
+  if (s_conn != NULL) {
+    s_conn->flags |= MG_F_CLOSE_IMMEDIATELY;
+  }
+}
+
+bool mgos_mqtt_global_is_connected(void) {
+  return s_connected;
+}
+
 static void reconnect_timer_cb(void *user_data) {
   s_reconnect_timer_id = MGOS_INVALID_TIMER_ID;
   mgos_mqtt_global_connect();
@@ -447,7 +487,9 @@ static void mqtt_switch_config(void) {
 
 static void mqtt_global_reconnect(void) {
   int rt_ms;
-  if (s_cfg == NULL || s_cfg->server == NULL) return;
+  if (s_cfg == NULL || s_cfg->server == NULL || s_reconnect_timeout_ms < 0) {
+    return;
+  }
 
   if (s_reconnect_timeout_ms >= s_cfg->reconnect_timeout_max * 1000) {
     mqtt_switch_config();
@@ -475,22 +517,23 @@ struct mg_connection *mgos_mqtt_get_global_conn(void) {
   return s_conn;
 }
 
-bool mgos_mqtt_pub(const char *topic, const void *message, size_t len, int qos,
-                   bool retain) {
+uint16_t mgos_mqtt_pub(const char *topic, const void *message, size_t len,
+                       int qos, bool retain) {
+  uint16_t packet_id = mgos_mqtt_get_packet_id();
   struct mg_connection *c = mgos_mqtt_get_global_conn();
   int flags = MG_MQTT_QOS(adjust_qos(qos));
   if (retain) flags |= MG_MQTT_RETAIN;
-  if (c == NULL || !s_connected) return false;
+  if (c == NULL || !s_connected) return 0;
   LOG(LL_DEBUG, ("Publishing to %s @ %d%s (%d): [%.*s]", topic, qos,
                  (retain ? " (RETAIN)" : ""), (int) len, (int) len,
                  (const char *) message));
-  mg_mqtt_publish(c, topic, mgos_mqtt_get_packet_id(), flags, message, len);
-  return true;
+  mg_mqtt_publish(c, topic, packet_id, flags, message, len);
+  return packet_id;
 }
 
-bool mgos_mqtt_pubf(const char *topic, int qos, bool retain,
-                    const char *json_fmt, ...) {
-  bool res;
+uint16_t mgos_mqtt_pubf(const char *topic, int qos, bool retain,
+                        const char *json_fmt, ...) {
+  uint16_t res;
   va_list ap;
   va_start(ap, json_fmt);
   res = mgos_mqtt_pubv(topic, qos, retain, json_fmt, ap);
@@ -498,9 +541,9 @@ bool mgos_mqtt_pubf(const char *topic, int qos, bool retain,
   return res;
 }
 
-bool mgos_mqtt_pubv(const char *topic, int qos, bool retain,
-                    const char *json_fmt, va_list ap) {
-  bool res = false;
+uint16_t mgos_mqtt_pubv(const char *topic, int qos, bool retain,
+                        const char *json_fmt, va_list ap) {
+  uint16_t res = 0;
   char *msg = json_vasprintf(json_fmt, ap);
   if (msg != NULL) {
     res = mgos_mqtt_pub(topic, msg, strlen(msg), qos, retain);
