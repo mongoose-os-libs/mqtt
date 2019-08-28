@@ -35,6 +35,8 @@ config_schema:
   # Alternative MQTT configuration. If enabled, client will alternate between mqtt and mqtt1
   # when unable to connect.
   - ["mqtt1", "mqtt", {title: "Backup MQTT settings"}]
+  - ["mqtt1.enable", false]
+  - ["mqtt1.server", ""]
   - ["debug.stdout_topic", "s", "", {title: "MQTT topic to publish STDOUT to"}]
   - ["debug.stderr_topic", "s", "", {title: "MQTT topic to publish STDERR to"}]
 cdefs:
