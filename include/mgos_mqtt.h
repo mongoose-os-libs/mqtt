@@ -22,16 +22,9 @@
  * for some background information.
  */
 
-#ifndef CS_FW_SRC_MGOS_MQTT_H_
-#define CS_FW_SRC_MGOS_MQTT_H_
+#pragma once
 
-#include <stdarg.h>
-#include <stdbool.h>
-
-#include "mgos_features.h"
-#include "mgos_init.h"
-#include "mgos_mongoose.h"
-#include "mgos_sys_config.h"
+#include "mgos_mqtt_conn.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,23 +33,13 @@ extern "C" {
 /*
  * Subscribe to a specific topic.
  * This handler will receive SUBACK - when first subscribed to the topic,
- * PUBLISH - for messages published to this topic, PUBACK - acks for PUBLISH
- * requests. MG_EV_CLOSE - when connection is closed.
+ * PUBLISH - for messages published to this topic.
  */
 void mgos_mqtt_global_subscribe(const struct mg_str topic,
                                 mg_event_handler_t handler, void *ud);
 
 /* Registers a mongoose handler to be invoked on the global MQTT connection */
 void mgos_mqtt_add_global_handler(mg_event_handler_t handler, void *ud);
-
-/*
- * Callback signature for `mgos_mqtt_set_connect_fn()`, see its docs for
- * details.
- */
-typedef void (*mgos_mqtt_connect_fn_t)(struct mg_connection *c,
-                                       const char *client_id,
-                                       struct mg_send_mqtt_handshake_opts *opts,
-                                       void *fn_arg);
 
 /*
  * Set connect callback. It is invoked when CONNECT message is about to
@@ -142,5 +125,3 @@ bool mgos_mqtt_set_config(const struct mgos_config_mqtt *cfg);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-
-#endif /* CS_FW_SRC_MGOS_MQTT_H_ */
