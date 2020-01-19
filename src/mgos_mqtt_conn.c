@@ -23,6 +23,10 @@
 #include "mgos_debug.h"
 #include "mgos_mongoose.h"
 
+// MG_MQTT_DUP is defined to 4 in mongoose.h, which is wrong.
+#undef MG_MQTT_DUP
+#define MG_MQTT_DUP 8
+
 struct mgos_mqtt_subscription {
   struct mg_str topic;
   uint16_t sub_id;
@@ -36,6 +40,14 @@ struct mgos_mqtt_conn_handler {
   mg_event_handler_t handler;
   void *user_data;
   SLIST_ENTRY(mgos_mqtt_conn_handler) next;
+};
+
+struct mgos_mqtt_conn_queue_entry {
+  char *topic;
+  uint16_t packet_id;
+  uint16_t flags;
+  struct mg_str msg;
+  STAILQ_ENTRY(mgos_mqtt_conn_queue_entry) next;
 };
 
 struct mgos_mqtt_conn {
@@ -53,6 +65,7 @@ struct mgos_mqtt_conn {
   void *connect_fn_arg;
   SLIST_HEAD(subscriptions, mgos_mqtt_subscription) subscriptions;
   SLIST_HEAD(conn_handlers, mgos_mqtt_conn_handler) conn_handlers;
+  STAILQ_HEAD(queue, mgos_mqtt_conn_queue_entry) queue;
 };
 
 static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c);
@@ -69,6 +82,7 @@ struct mgos_mqtt_conn *mgos_mqtt_conn_create2(
   c->cfg = cfg0;
   c->reconnect_timer_id = MGOS_INVALID_TIMER_ID;
   c->max_qos = -1;
+  STAILQ_INIT(&c->queue);
   mgos_event_add_handler(MGOS_NET_EV_IP_ACQUIRED, mgos_mqtt_conn_net_ev, c);
   return c;
 }
@@ -94,9 +108,33 @@ static int adjust_qos(const struct mgos_mqtt_conn *c, int qos) {
 }
 
 static uint16_t mgos_mqtt_conn_get_packet_id(struct mgos_mqtt_conn *c) {
-  c->packet_id++;
-  if (c->packet_id == 0) c->packet_id++;
+  while (true) {
+    c->packet_id++;
+    if (c->packet_id == 0) continue;
+    struct mgos_mqtt_conn_queue_entry *qe = NULL;
+    STAILQ_FOREACH(qe, &c->queue, next) {
+      if (qe->packet_id == c->packet_id) break;
+    }
+    if (qe == NULL) break;
+  }
   return c->packet_id;
+}
+
+static void mgos_mqtt_conn_queue_entry_free(
+    struct mgos_mqtt_conn_queue_entry *qe) {
+  free(qe->topic);
+  mg_strfree(&qe->msg);
+  free(qe);
+}
+
+static void mgos_mqtt_conn_queue_remove(struct mgos_mqtt_conn *c,
+                                        uint16_t packet_id) {
+  struct mgos_mqtt_conn_queue_entry *qe, *qet;
+  STAILQ_FOREACH_SAFE(qe, &c->queue, next, qet) {
+    if (qe->packet_id != packet_id) continue;
+    STAILQ_REMOVE(&c->queue, qe, mgos_mqtt_conn_queue_entry, next);
+    mgos_mqtt_conn_queue_entry_free(qe);
+  }
 }
 
 static bool call_topic_handler(struct mgos_mqtt_conn *c, int ev,
@@ -124,14 +162,23 @@ static void call_conn_handlers(struct mgos_mqtt_conn *c, int ev,
   }
 }
 
-static void do_subscribe(struct mgos_mqtt_conn *c,
-                         struct mgos_mqtt_subscription *s) {
+static void do_pub(struct mgos_mqtt_conn *c, uint16_t packet_id,
+                   const char *topic, struct mg_str msg, int flags) {
+  int qos = MG_MQTT_GET_QOS(flags);
+  bool dup = ((flags & MG_MQTT_DUP) != 0);
+  bool retain = ((flags & MG_MQTT_RETAIN) != 0);
+  LOG(LL_DEBUG, ("MQTT%d pub %s @ %d%s%s (%d): [%.*s]", c->conn_id, topic, qos,
+                 (dup ? " DUP" : ""), (retain ? " RETAIN" : ""), (int) msg.len,
+                 (int) msg.len, msg.p));
+  mg_mqtt_publish(c->nc, topic, packet_id, flags, msg.p, msg.len);
+}
+
+static void do_sub(struct mgos_mqtt_conn *c, struct mgos_mqtt_subscription *s) {
   struct mg_mqtt_topic_expression te = {.topic = s->topic.p,
                                         .qos = adjust_qos(c, s->qos)};
   s->sub_id = mgos_mqtt_conn_get_packet_id(c);
   mg_mqtt_subscribe(c->nc, &te, 1, s->sub_id);
-  LOG(LL_INFO,
-      ("MQTT%d Subscribing to '%s' (QoS %d)", c->conn_id, te.topic, te.qos));
+  LOG(LL_INFO, ("MQTT%d sub %s @ %d", c->conn_id, te.topic, te.qos));
 }
 
 static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
@@ -145,6 +192,7 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
     LOG(LL_DEBUG, ("MQTT%d event: %d", c->conn_id, ev));
   }
   const struct mgos_config_mqtt *cfg = c->cfg;
+  const struct mg_mqtt_message *msg = (struct mg_mqtt_message *) ev_data;
   switch (ev) {
     case MG_EV_CONNECT: {
       int status = *((int *) ev_data);
@@ -204,7 +252,7 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
         call_conn_handlers(c, ev, ev_data);
         struct mgos_mqtt_subscription *s;
         SLIST_FOREACH(s, &c->subscriptions, next) {
-          do_subscribe(c, s);
+          do_sub(c, s);
         }
       } else {
         nc->flags |= MG_F_CLOSE_IMMEDIATELY;
@@ -215,8 +263,11 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
     case MG_EV_MQTT_SUBACK:
     case MG_EV_MQTT_PUBLISH:
       if (call_topic_handler(c, ev, ev_data)) break;
-    /* fall through */
+      call_conn_handlers(c, ev, ev_data);
+      break;
     case MG_EV_MQTT_PUBACK:
+      mgos_mqtt_conn_queue_remove(c, msg->message_id);
+      /* fall through */
     case MG_EV_MQTT_CONNECT:
     case MG_EV_MQTT_PUBREL:
     case MG_EV_MQTT_PUBCOMP:
@@ -228,11 +279,20 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       call_conn_handlers(c, ev, ev_data);
       break;
     case MG_EV_MQTT_PUBREC: {
-      struct mg_mqtt_message *msg = (struct mg_mqtt_message *) ev_data;
       mg_mqtt_pubrel(nc, msg->message_id);
       call_conn_handlers(c, ev, ev_data);
+      mgos_mqtt_conn_queue_remove(c, msg->message_id);
       break;
     }
+  }
+  /* If we have received some sort of MQTT message, queue is not empty
+   * and we have nothing else to send, drain the queue.
+   * This will usually be CONNACK and PUBACK, but can be PINGRESP as well. */
+  if (!STAILQ_EMPTY(&c->queue) && nc->send_mbuf.len == 0 &&
+      (ev == MG_EV_MQTT_CONNACK || ev == MG_EV_MQTT_PUBACK ||
+       ev == MG_EV_MQTT_PUBREC || ev == MG_EV_MQTT_PINGRESP)) {
+    struct mgos_mqtt_conn_queue_entry *qe = STAILQ_FIRST(&c->queue);
+    do_pub(c, qe->packet_id, qe->topic, qe->msg, (qe->flags | MG_MQTT_DUP));
   }
 }
 
@@ -443,14 +503,35 @@ static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c) {
 
 uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
                             struct mg_str msg, int qos, bool retain) {
-  if (c == NULL || !c->connected) return 0;
+  if (c == NULL) return 0;
   uint16_t packet_id = mgos_mqtt_conn_get_packet_id(c);
   int flags = MG_MQTT_QOS(adjust_qos(c, qos));
   if (retain) flags |= MG_MQTT_RETAIN;
-  LOG(LL_DEBUG,
-      ("MQTT%d Publishing to %s @ %d%s (%d): [%.*s]", c->conn_id, topic, qos,
-       (retain ? " (RETAIN)" : ""), (int) msg.len, (int) msg.len, msg.p));
-  mg_mqtt_publish(c->nc, topic, packet_id, flags, msg.p, msg.len);
+  if (c->connected) {
+    do_pub(c, packet_id, topic, msg, flags);
+  }
+  if (qos > 0 && c->cfg->max_queue_length > 0) {
+    size_t qlen = 0;
+    struct mgos_mqtt_conn_queue_entry *qe;
+    STAILQ_FOREACH(qe, &c->queue, next) {
+      qlen++;
+    }
+    while (qlen >= (size_t) c->cfg->max_queue_length) {
+      LOG(LL_ERROR, ("MQTT%d queue overflow!", c->conn_id));
+      qe = STAILQ_FIRST(&c->queue);
+      STAILQ_REMOVE_HEAD(&c->queue, next);
+      mgos_mqtt_conn_queue_entry_free(qe);
+      qlen--;
+    }
+    qe = calloc(1, sizeof(*qe));
+    if (qe == NULL) goto out;
+    qe->topic = strdup(topic);
+    qe->packet_id = packet_id;
+    qe->flags = (uint16_t) flags;
+    qe->msg = mg_strdup(msg);
+    STAILQ_INSERT_TAIL(&c->queue, qe, next);
+  }
+out:
   return packet_id;
 }
 
@@ -488,7 +569,7 @@ void mgos_mqtt_conn_sub_s(struct mgos_mqtt_conn *c, struct mg_str topic,
   s->user_data = user_data;
   s->qos = adjust_qos(c, qos);
   SLIST_INSERT_HEAD(&c->subscriptions, s, next);
-  if (c->connected) do_subscribe(c, s);
+  if (c->connected) do_sub(c, s);
 }
 
 void mgos_mqtt_conn_sub(struct mgos_mqtt_conn *c, const char *topic, int qos,
@@ -497,5 +578,12 @@ void mgos_mqtt_conn_sub(struct mgos_mqtt_conn *c, const char *topic, int qos,
 }
 
 size_t mgos_mqtt_conn_num_unsent_bytes(struct mgos_mqtt_conn *c) {
-  return (c != NULL && c->nc != NULL ? c->nc->send_mbuf.len : 0);
+  size_t num_bytes = 0;
+  if (c == NULL) return 0;
+  struct mgos_mqtt_conn_queue_entry *qe;
+  STAILQ_FOREACH(qe, &c->queue, next) {
+    num_bytes += qe->msg.len;
+  }
+  if (c->nc != NULL) num_bytes += c->nc->send_mbuf.len;
+  return num_bytes;
 }
