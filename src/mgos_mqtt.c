@@ -31,11 +31,9 @@
 
 static struct mgos_mqtt_conn *s_conn = NULL;
 
+extern uint16_t mgos_mqtt_conn_get_packet_id(struct mgos_mqtt_conn *c);
 uint16_t mgos_mqtt_get_packet_id(void) {
-  static uint16_t s_packet_id = 0;
-  s_packet_id++;
-  if (s_packet_id == 0) s_packet_id++;
-  return s_packet_id;
+  return mgos_mqtt_conn_get_packet_id(s_conn);
 }
 
 extern void mgos_mqtt_conn_sub_s(struct mgos_mqtt_conn *c, struct mg_str topic,

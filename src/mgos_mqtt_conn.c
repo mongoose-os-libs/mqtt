@@ -107,7 +107,7 @@ static int adjust_qos(const struct mgos_mqtt_conn *c, int qos) {
   return MIN(qos, max_qos);
 }
 
-static uint16_t mgos_mqtt_conn_get_packet_id(struct mgos_mqtt_conn *c) {
+uint16_t mgos_mqtt_conn_get_packet_id(struct mgos_mqtt_conn *c) {
   while (true) {
     c->packet_id++;
     if (c->packet_id == 0) continue;
