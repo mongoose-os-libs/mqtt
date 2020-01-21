@@ -70,6 +70,33 @@ struct mgos_mqtt_conn {
 
 static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c);
 static void mgos_mqtt_conn_net_ev(int ev, void *evd, void *arg);
+static void mgos_mqtt_free_cfg(struct mgos_config_mqtt *cfg);
+
+static struct mgos_config_mqtt *mgos_mqtt_copy_cfg(
+    const struct mgos_config_mqtt *cfg) {
+  if (cfg == NULL) return NULL;
+  struct mgos_config_mqtt *new_cfg = NULL;
+  if (cfg == mgos_sys_config_get_mqtt() || cfg == mgos_sys_config_get_mqtt1()) {
+    new_cfg = (struct mgos_config_mqtt *) cfg;
+  } else {
+    new_cfg = (struct mgos_config_mqtt *) calloc(1, sizeof(*new_cfg));
+    if (new_cfg == NULL || !mgos_config_copy_mqtt(cfg, new_cfg)) {
+      mgos_mqtt_free_cfg(new_cfg);
+      free(new_cfg);
+      new_cfg = NULL;
+    } else {
+    }
+  }
+  return new_cfg;
+}
+
+static void mgos_mqtt_free_cfg(struct mgos_config_mqtt *cfg) {
+  if (cfg == NULL) return;
+  if (cfg == mgos_sys_config_get_mqtt() || cfg == mgos_sys_config_get_mqtt1())
+    return;
+  mgos_config_free_mqtt(cfg);
+  free(cfg);
+}
 
 struct mgos_mqtt_conn *mgos_mqtt_conn_create2(
     int conn_id, const struct mgos_config_mqtt *cfg0,
@@ -77,9 +104,9 @@ struct mgos_mqtt_conn *mgos_mqtt_conn_create2(
   struct mgos_mqtt_conn *c = (struct mgos_mqtt_conn *) calloc(1, sizeof(*c));
   if (c == NULL) return NULL;
   c->conn_id = (int16_t) conn_id;
-  c->cfg0 = cfg0;
-  c->cfg1 = cfg1;
-  c->cfg = cfg0;
+  c->cfg0 = mgos_mqtt_copy_cfg(cfg0);
+  c->cfg1 = mgos_mqtt_copy_cfg(cfg1);
+  c->cfg = c->cfg0;
   c->reconnect_timer_id = MGOS_INVALID_TIMER_ID;
   c->max_qos = -1;
   STAILQ_INIT(&c->queue);
@@ -322,13 +349,6 @@ static void mgos_mqtt_conn_net_ev(int ev, void *evd, void *arg) {
   (void) ev;
 }
 
-static void mgos_mqtt_free_cfg(struct mgos_config_mqtt *cfg) {
-  if (cfg == NULL) return;
-  if (cfg == mgos_sys_config_get_mqtt() || mgos_sys_config_get_mqtt1()) return;
-  mgos_config_free_mqtt(cfg);
-  free(cfg);
-}
-
 void mgos_mqtt_conn_set_max_qos(struct mgos_mqtt_conn *c, int qos) {
   if (c == NULL || c->cfg == NULL || c->cfg->max_qos == qos) return;
   c->max_qos = (int16_t) qos;
@@ -347,13 +367,8 @@ bool mgos_mqtt_conn_set_config(struct mgos_mqtt_conn *c,
     LOG(LL_ERROR, ("MQTT requires server name"));
     goto out;
   }
-  if (cfg == mgos_sys_config_get_mqtt() || mgos_sys_config_get_mqtt1()) {
-    new_cfg = (struct mgos_config_mqtt *) cfg;
-    ret = true;
-  } else {
-    new_cfg = (struct mgos_config_mqtt *) calloc(1, sizeof(*new_cfg));
-    ret = mgos_config_copy_mqtt(cfg, new_cfg);
-  }
+  new_cfg = mgos_mqtt_copy_cfg(cfg);
+  ret = (new_cfg != NULL);
 
 out:
   if (ret) {
