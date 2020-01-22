@@ -479,7 +479,7 @@ static void mqtt_switch_config(struct mgos_mqtt_conn *c) {
     /* User set a custom config - don't mess with it. */
     return;
   }
-  if (cfg->enable) {
+  if (cfg != NULL && cfg->enable) {
     c->cfg = cfg;
     c->reconnect_timeout_ms = cfg->reconnect_timeout_min * 1000;
   }
