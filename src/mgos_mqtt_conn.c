@@ -45,6 +45,7 @@ struct mgos_mqtt_conn_handler {
 struct mgos_mqtt_conn_queue_entry {
   char *topic;
   uint16_t packet_id;
+  // DUP flag on queue entry is used to delay re-delivery.
   uint16_t flags;
   struct mg_str msg;
   STAILQ_ENTRY(mgos_mqtt_conn_queue_entry) next;
@@ -61,6 +62,7 @@ struct mgos_mqtt_conn {
   int16_t max_qos;
   uint16_t packet_id;
   bool connected;
+  bool queue_drained;
   mgos_mqtt_connect_fn_t connect_fn;
   void *connect_fn_arg;
   SLIST_HEAD(subscriptions, mgos_mqtt_subscription) subscriptions;
@@ -160,6 +162,7 @@ static void mgos_mqtt_conn_queue_remove(struct mgos_mqtt_conn *c,
   STAILQ_FOREACH_SAFE(qe, &c->queue, next, qet) {
     if (qe->packet_id != packet_id) continue;
     STAILQ_REMOVE(&c->queue, qe, mgos_mqtt_conn_queue_entry, next);
+    LOG(LL_DEBUG, ("MQTT%d ack %d", c->conn_id, qe->packet_id));
     mgos_mqtt_conn_queue_entry_free(qe);
   }
 }
@@ -194,9 +197,10 @@ static void do_pub(struct mgos_mqtt_conn *c, uint16_t packet_id,
   int qos = MG_MQTT_GET_QOS(flags);
   bool dup = ((flags & MG_MQTT_DUP) != 0);
   bool retain = ((flags & MG_MQTT_RETAIN) != 0);
-  LOG(LL_DEBUG, ("MQTT%d pub %s @ %d%s%s (%d): [%.*s]", c->conn_id, topic, qos,
-                 (dup ? " DUP" : ""), (retain ? " RETAIN" : ""), (int) msg.len,
-                 (int) msg.len, msg.p));
+  LOG(LL_DEBUG,
+      ("MQTT%d pub -> %d %s @ %d%s%s (%d): [%.*s]", c->conn_id, packet_id,
+       topic, qos, (dup ? " DUP" : ""), (retain ? " RETAIN" : ""),
+       (int) msg.len, (int) msg.len, msg.p));
   mg_mqtt_publish(c->nc, topic, packet_id, flags, msg.p, msg.len);
 }
 
@@ -281,6 +285,14 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
         SLIST_FOREACH(s, &c->subscriptions, next) {
           do_sub(c, s);
         }
+        if (!STAILQ_EMPTY(&c->queue)) {
+          struct mgos_mqtt_conn_queue_entry *qe;
+          STAILQ_FOREACH(qe, &c->queue, next) {
+            qe->flags &= ~MG_MQTT_DUP;
+          }
+        } else {
+          c->queue_drained = false;
+        }
       } else {
         nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       }
@@ -315,11 +327,31 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
   /* If we have received some sort of MQTT message, queue is not empty
    * and we have nothing else to send, drain the queue.
    * This will usually be CONNACK and PUBACK, but can be PINGRESP as well. */
-  if (!STAILQ_EMPTY(&c->queue) && nc->send_mbuf.len == 0 &&
-      (ev == MG_EV_MQTT_CONNACK || ev == MG_EV_MQTT_PUBACK ||
+  if ((ev == MG_EV_MQTT_CONNACK || ev == MG_EV_MQTT_PUBACK ||
        ev == MG_EV_MQTT_PUBREC || ev == MG_EV_MQTT_PINGRESP)) {
-    struct mgos_mqtt_conn_queue_entry *qe = STAILQ_FIRST(&c->queue);
-    do_pub(c, qe->packet_id, qe->topic, qe->msg, (qe->flags | MG_MQTT_DUP));
+    struct mgos_mqtt_conn_queue_entry *qe;
+    if (ev == MG_EV_MQTT_PINGRESP) {
+      /* PINGRESP allows re-retransmission, i.e. we will re-send messages
+       * we have already sent in this connection and that server has not yet
+       * acked for some reason. This rarely (if ever) happens. */
+      STAILQ_FOREACH(qe, &c->queue, next) {
+        qe->flags &= ~MG_MQTT_DUP;
+      }
+    }
+    if (!STAILQ_EMPTY(&c->queue)) {
+      STAILQ_FOREACH(qe, &c->queue, next) {
+        if (!(qe->flags & MG_MQTT_DUP)) break;
+      }
+      if (qe != NULL) {
+        qe->flags |= MG_MQTT_DUP;
+        do_pub(c, qe->packet_id, qe->topic, qe->msg, (qe->flags | MG_MQTT_DUP));
+      }
+    } else if (!c->queue_drained && STAILQ_EMPTY(&c->queue)) {
+      // The queue has been drained at least once, immediate publishing is
+      // allowed.
+      c->queue_drained = true;
+      LOG(LL_DEBUG, ("MQTT%d queue drained", c->conn_id));
+    }
   }
 }
 
@@ -522,7 +554,12 @@ uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
   uint16_t packet_id = mgos_mqtt_conn_get_packet_id(c);
   int flags = MG_MQTT_QOS(adjust_qos(c, qos));
   if (retain) flags |= MG_MQTT_RETAIN;
-  if (c->connected) {
+  // If we are connected and have drained the initial queue, publish immediately
+  // On initial connection we want queue to be processed in order, without
+  // later entries jumping ahead of the queue - this could cause out of order
+  // shadow updates, for example, where a newer update would be overridden by
+  // an entry replayed from the queue.
+  if (c->connected && c->queue_drained) {
     do_pub(c, packet_id, topic, msg, flags);
   }
   if (qos > 0 && c->cfg->max_queue_length > 0) {
