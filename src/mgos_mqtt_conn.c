@@ -328,7 +328,8 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
    * and we have nothing else to send, drain the queue.
    * This will usually be CONNACK and PUBACK, but can be PINGRESP as well. */
   if ((ev == MG_EV_MQTT_CONNACK || ev == MG_EV_MQTT_PUBACK ||
-       ev == MG_EV_MQTT_PUBREC || ev == MG_EV_MQTT_PINGRESP)) {
+       ev == MG_EV_MQTT_PUBREC || ev == MG_EV_MQTT_PINGRESP) &&
+      c->connected) {
     struct mgos_mqtt_conn_queue_entry *qe;
     if (ev == MG_EV_MQTT_PINGRESP) {
       /* PINGRESP allows re-retransmission, i.e. we will re-send messages
