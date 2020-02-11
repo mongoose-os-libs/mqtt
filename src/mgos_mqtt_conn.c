@@ -23,10 +23,6 @@
 #include "mgos_debug.h"
 #include "mgos_mongoose.h"
 
-// MG_MQTT_DUP is defined to 4 in mongoose.h, which is wrong.
-#undef MG_MQTT_DUP
-#define MG_MQTT_DUP 8
-
 struct mgos_mqtt_subscription {
   struct mg_str topic;
   uint16_t sub_id;
