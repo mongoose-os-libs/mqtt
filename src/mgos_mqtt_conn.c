@@ -341,7 +341,7 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       }
       if (qe != NULL) {
         qe->flags |= MG_MQTT_DUP;
-        do_pub(c, qe->packet_id, qe->topic, qe->msg, (qe->flags | MG_MQTT_DUP));
+        do_pub(c, qe->packet_id, qe->topic, qe->msg, qe->flags);
       }
     } else if (!c->queue_drained && STAILQ_EMPTY(&c->queue)) {
       // The queue has been drained at least once, immediate publishing is
@@ -548,6 +548,7 @@ static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c) {
 uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
                             struct mg_str msg, int qos, bool retain) {
   if (c == NULL) return 0;
+  bool published = false;
   uint16_t packet_id = mgos_mqtt_conn_get_packet_id(c);
   int flags = MG_MQTT_QOS(adjust_qos(c, qos));
   if (retain) flags |= MG_MQTT_RETAIN;
@@ -558,6 +559,7 @@ uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
   // an entry replayed from the queue.
   if (c->connected && c->queue_drained) {
     do_pub(c, packet_id, topic, msg, flags);
+    published = true;
   }
   if (qos > 0 && c->cfg->max_queue_length > 0) {
     size_t qlen = 0;
@@ -578,6 +580,8 @@ uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
     qe->packet_id = packet_id;
     qe->flags = (uint16_t) flags;
     qe->msg = mg_strdup(msg);
+    // Prevent immediate retry.
+    if (published) qe->flags |= MG_MQTT_DUP;
     STAILQ_INSERT_TAIL(&c->queue, qe, next);
   }
 out:
