@@ -276,7 +276,6 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
           struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
           mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTED, &arg);
         }
-        call_conn_handlers(c, ev, ev_data);
         struct mgos_mqtt_subscription *s;
         SLIST_FOREACH(s, &c->subscriptions, next) {
           do_sub(c, s);
@@ -286,9 +285,11 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
           STAILQ_FOREACH(qe, &c->queue, next) {
             qe->flags &= ~MG_MQTT_DUP;
           }
-        } else {
           c->queue_drained = false;
+        } else {
+          c->queue_drained = true;
         }
+        call_conn_handlers(c, ev, ev_data);
       } else {
         nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       }
@@ -557,7 +558,7 @@ uint16_t mgos_mqtt_conn_pub(struct mgos_mqtt_conn *c, const char *topic,
   // later entries jumping ahead of the queue - this could cause out of order
   // shadow updates, for example, where a newer update would be overridden by
   // an entry replayed from the queue.
-  if (c->connected && c->queue_drained) {
+  if (c->connected && (qos == 0 || c->queue_drained)) {
     do_pub(c, packet_id, topic, msg, flags);
     published = true;
   }
