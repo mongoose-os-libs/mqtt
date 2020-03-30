@@ -104,6 +104,11 @@ void mgos_mqtt_conn_sub(struct mgos_mqtt_conn *c, const char *topic, int qos,
                         mg_event_handler_t handler, void *user_data);
 
 /*
+ * Unsubscribe from a specific topic.
+ */
+bool mgos_mqtt_conn_unsub(struct mgos_mqtt_conn *c, const char *topic);
+
+/*
  * Returns number of pending bytes to send.
  */
 size_t mgos_mqtt_conn_num_unsent_bytes(struct mgos_mqtt_conn *c);
