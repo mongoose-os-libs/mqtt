@@ -97,6 +97,11 @@ typedef void (*sub_handler_t)(struct mg_connection *nc, const char *topic,
 void mgos_mqtt_sub(const char *topic, sub_handler_t, void *ud);
 
 /*
+ * Unsubscribe on a topic on a configured MQTT server.
+ */
+bool mgos_mqtt_unsub(const char *topic);
+
+/*
  * Returns number of pending bytes to send.
  */
 size_t mgos_mqtt_num_unsent_bytes(void);

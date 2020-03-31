@@ -631,6 +631,24 @@ void mgos_mqtt_conn_sub(struct mgos_mqtt_conn *c, const char *topic, int qos,
   mgos_mqtt_conn_sub_s(c, mg_mk_str(topic), qos, handler, user_data);
 }
 
+bool mgos_mqtt_conn_unsub(struct mgos_mqtt_conn *c, const char *topic) {
+  struct mgos_mqtt_subscription *s;
+
+  SLIST_FOREACH(s, &c->subscriptions, next) {
+    if (0 == strcmp(s->topic.p, topic)) {
+      LOG(LL_INFO,
+          ("MQTT%d unsub %.*s", c->conn_id, (int) s->topic.len, s->topic.p));
+      // mg_mqtt_unsubscribe(c->nc, (char **)&topic, 1, mgos_mqtt_conn_get_packet_id(c));
+      SLIST_REMOVE(&c->subscriptions, s, mgos_mqtt_subscription, next);
+      mg_strfree(&s->topic);
+      free(s->user_data);
+      free(s);
+      return true;
+    }
+  }
+  return false;
+}
+
 size_t mgos_mqtt_conn_num_unsent_bytes(struct mgos_mqtt_conn *c) {
   size_t num_bytes = 0;
   if (c == NULL) return 0;

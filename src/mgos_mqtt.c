@@ -149,6 +149,10 @@ void mgos_mqtt_sub(const char *topic, sub_handler_t handler, void *user_data) {
   mgos_mqtt_global_subscribe(mg_mk_str(topic), mqttsubtrampoline, sd);
 }
 
+bool mgos_mqtt_unsub(const char *topic) {
+  return mgos_mqtt_conn_unsub(s_conn, topic);
+}
+
 size_t mgos_mqtt_num_unsent_bytes(void) {
   return mgos_mqtt_conn_num_unsent_bytes(s_conn);
 }
