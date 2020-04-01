@@ -635,7 +635,7 @@ bool mgos_mqtt_conn_unsub(struct mgos_mqtt_conn *c, const char *topic) {
   struct mgos_mqtt_subscription *s;
 
   SLIST_FOREACH(s, &c->subscriptions, next) {
-    if (0 == strcmp(s->topic.p, topic)) {
+    if (0 == mg_vcmp(&s->topic, topic)) {
       LOG(LL_INFO,
           ("MQTT%d unsub %.*s", c->conn_id, (int) s->topic.len, s->topic.p));
       if (c->connected) {
