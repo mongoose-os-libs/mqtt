@@ -466,6 +466,8 @@ bool mgos_mqtt_conn_connect(struct mgos_mqtt_conn *c) {
     server = strdup(cfg->server);
   }
   LOG(LL_INFO, ("MQTT%d connecting to %s", c->conn_id, server));
+  struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+  mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTING, &arg);
 
   c->connected = false;
   c->nc = mg_connect_opt(mgos_get_mgr(), server, mgos_mqtt_ev, c, opts);
