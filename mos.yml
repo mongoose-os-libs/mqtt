@@ -42,6 +42,7 @@ config_schema:
   - ["mqtt1.server", ""]
   - ["debug.stdout_topic", "s", "", {title: "MQTT topic to publish STDOUT to"}]
   - ["debug.stderr_topic", "s", "", {title: "MQTT topic to publish STDERR to"}]
+  - ["mqtt.debug_use_log_level", "b", false, {title: "Use the cs_log_level enum instead of stdout/stderr flag"}]
 cdefs:
   MG_ENABLE_MQTT: 1
 tags:
