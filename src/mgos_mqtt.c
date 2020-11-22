@@ -55,19 +55,28 @@ void mgos_mqtt_set_connect_fn(mgos_mqtt_connect_fn_t fn, void *fn_arg) {
 static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
   if (s_conn == NULL) return;
   struct mgos_debug_hook_arg *arg = (struct mgos_debug_hook_arg *) ev_data;
-  const char *topic =
-      (arg->fd == 1
-           ? mgos_sys_config_get_debug_stdout_topic()
-           : arg->fd == 2 ? mgos_sys_config_get_debug_stderr_topic() : NULL);
+  const char *topic = (arg->fd == 1   ? mgos_sys_config_get_debug_stdout_topic()
+                       : arg->fd == 2 ? mgos_sys_config_get_debug_stderr_topic()
+                                      : NULL);
   if (topic != NULL &&
       mgos_mqtt_num_unsent_bytes() < MGOS_MQTT_LOG_PUSHBACK_THRESHOLD) {
     static uint32_t s_seq = 0;
     char *msg = arg->buf;
+
+    int log_level = arg->fd;
+
+    if (mgos_sys_config_get_mqtt_debug_use_log_level()){
+      log_level = (int)arg->level; // ie LL_INFO
+      if (arg->fd == 2) {  // stderr
+        log_level = 0;     // LL_ERROR
+      }
+    }
+
     int msg_len = mg_asprintf(
         &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
         (mgos_sys_config_get_device_id() ? mgos_sys_config_get_device_id()
                                          : "-"),
-        (unsigned int) s_seq, mg_time(), arg->fd, (int) arg->len,
+        (unsigned int) s_seq, mg_time(), log_level, (int) arg->len,
         (const char *) arg->data);
     if (arg->len > 0) {
       mgos_mqtt_conn_pub(s_conn, topic, mg_mk_str_n(msg, msg_len), 0 /* qos */,
@@ -176,6 +185,9 @@ bool mgos_mqtt_init(void) {
                                     mgos_sys_config_get_mqtt1());
   }
 
+  LOG(LL_DEBUG, ("mqtt log_level %d | debug_use_log_level %d", 99,
+         mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
+  
   mgos_event_add_handler(MGOS_EVENT_LOG, s_debug_write_cb, NULL);
 
   return true;
