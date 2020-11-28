@@ -67,15 +67,16 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
     int log_level = arg->fd;
     if (mgos_sys_config_get_mqtt_debug_use_log_level()){
       log_level = (int)arg->level; // ie LL_INFO
+
       if (arg->fd == 2){ // stderr
         log_level = 0; // LL_ERROR
       }
     }
 
-    LOG(LL_WARN, ("mqtt log_level %d | use log level %d", log_level, mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
+    LOG(LL_INFO, ("mqtt mark log_level %d | use log level %d", log_level, mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
 
     int msg_len = mg_asprintf(
-        &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
+        &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s |new",
         (mgos_sys_config_get_device_id() ? mgos_sys_config_get_device_id()
                                          : "-"),
         (unsigned int) s_seq, mg_time(), log_level, (int) arg->len,

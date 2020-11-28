@@ -22,6 +22,7 @@
 #include "mgos.h"
 #include "mgos_debug.h"
 #include "mgos_mongoose.h"
+#include "mgos_event.h"
 
 struct mgos_mqtt_subscription {
   struct mg_str topic;
@@ -225,7 +226,13 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       int status = *((int *) ev_data);
       LOG(LL_INFO, ("MQTT%d TCP connect %s (%d)", c->conn_id,
                     (status == 0 ? "ok" : "error"), status));
-      if (status != 0) break;
+      if (status != 0){
+        if (cfg->cloud_events) {
+          struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+          mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTERROR, &arg);
+        }
+        break;
+      }
       struct mg_send_mqtt_handshake_opts opts;
       memset(&opts, 0, sizeof(opts));
       opts.user_name = cfg->user;
