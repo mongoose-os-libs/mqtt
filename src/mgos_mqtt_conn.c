@@ -78,7 +78,7 @@ static struct mgos_config_mqtt *mgos_mqtt_copy_cfg(
     new_cfg = (struct mgos_config_mqtt *) cfg;
   } else {
     new_cfg = (struct mgos_config_mqtt *) calloc(1, sizeof(*new_cfg));
-    if (new_cfg == NULL || !mgos_config_copy_mqtt(cfg, new_cfg)) {
+    if (new_cfg == NULL || !mgos_config_mqtt_copy(cfg, new_cfg)) {
       mgos_mqtt_free_cfg(new_cfg);
       free(new_cfg);
       new_cfg = NULL;
@@ -92,7 +92,7 @@ static void mgos_mqtt_free_cfg(struct mgos_config_mqtt *cfg) {
   if (cfg == NULL) return;
   if (cfg == mgos_sys_config_get_mqtt() || cfg == mgos_sys_config_get_mqtt1())
     return;
-  mgos_config_free_mqtt(cfg);
+  mgos_config_mqtt_free(cfg);
   free(cfg);
 }
 
