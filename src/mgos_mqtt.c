@@ -66,14 +66,7 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
     int log_level = arg->fd;
     if (mgos_sys_config_get_mqtt_debug_use_log_level()) {
       log_level = (int) arg->level;  // ie LL_INFO
-
-      if (arg->fd == 2) {  // stderr
-        log_level = 0;     // LL_ERROR
-      }
     }
-
-    printf("mqtt log_level %d | debug_use_log_level %d", log_level,
-           mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0);
 
     int msg_len = mg_asprintf(
         &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
@@ -187,6 +180,11 @@ bool mgos_mqtt_init(void) {
     s_conn = mgos_mqtt_conn_create2(0, mgos_sys_config_get_mqtt(),
                                     mgos_sys_config_get_mqtt1());
   }
+
+
+  LOG(LL_INFO, ("mqtt log_level %d | debug_use_log_level %d", 99,
+         mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
+
 
   mgos_event_add_handler(MGOS_EVENT_LOG, s_debug_write_cb, NULL);
 
