@@ -72,11 +72,11 @@ static void s_debug_write_cb(int ev, void *ev_data, void *userdata) {
       }
     }
 
-    LOG(LL_INFO, ("mqtt mark log_level %d | use log level %d", log_level,
+    LOG(LL_VERBOSE_DEBUG, ("mqtt log_level %d | debug_use_log_level %d", log_level,
                   mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
 
     int msg_len = mg_asprintf(
-        &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s |new",
+        &msg, MGOS_DEBUG_TMP_BUF_SIZE, "%s %u %.3lf %d|%.*s",
         (mgos_sys_config_get_device_id() ? mgos_sys_config_get_device_id()
                                          : "-"),
         (unsigned int) s_seq, mg_time(), log_level, (int) arg->len,
