@@ -198,6 +198,9 @@ static void do_pub(struct mgos_mqtt_conn *c, uint16_t packet_id,
        topic, qos, (dup ? " DUP" : ""), (retain ? " RETAIN" : ""),
        (int) msg.len, (int) msg.len, msg.p));
   mg_mqtt_publish(c->nc, topic, packet_id, flags, msg.p, msg.len);
+  (void) qos;
+  (void) dup;
+  (void) retain;
 }
 
 static void do_sub(struct mgos_mqtt_conn *c, struct mgos_mqtt_subscription *s) {
