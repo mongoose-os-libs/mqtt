@@ -489,9 +489,7 @@ bool mgos_mqtt_conn_connect(struct mgos_mqtt_conn *c) {
 void mgos_mqtt_conn_disconnect(struct mgos_mqtt_conn *c) {
   if (c == NULL) return;
   c->reconnect_timeout_ms = -1;  // Prevent reconnect.
-  if (c->nc != NULL) {
-    c->nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-  }
+  mg_mqtt_disconnect(c->nc);
 }
 
 bool mgos_mqtt_conn_is_connected(struct mgos_mqtt_conn *c) {
