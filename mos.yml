@@ -51,4 +51,4 @@ tags:
 
 # Temporary, while root manifest change propagates (2018/03/29).
 libs:
-  - origin: https://github.com/mongoose-os-libs/core
+  - location: https://github.com/mongoose-os-libs/core
