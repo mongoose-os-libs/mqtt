@@ -165,19 +165,20 @@ static void mgos_mqtt_conn_queue_remove(struct mgos_mqtt_conn *c,
 
 static bool call_topic_handler(struct mgos_mqtt_conn *c, int ev,
                                void *ev_data) {
+  bool handled = false;
   struct mg_mqtt_message *msg = (struct mg_mqtt_message *) ev_data;
   struct mgos_mqtt_subscription *s;
   SLIST_FOREACH(s, &c->subscriptions, next) {
     if ((ev == MG_EV_MQTT_SUBACK && s->sub_id == msg->message_id) ||
         mg_mqtt_match_topic_expression(s->topic, msg->topic)) {
-      if (ev == MG_EV_MQTT_PUBLISH && msg->qos > 0) {
+      if (!handled && ev == MG_EV_MQTT_PUBLISH && msg->qos > 0) {
         mg_mqtt_puback(c->nc, msg->message_id);
       }
       s->handler(c->nc, ev, ev_data, s->user_data);
-      return true;
+      handled = true;
     }
   }
-  return false;
+  return handled;
 }
 
 static void call_conn_handlers(struct mgos_mqtt_conn *c, int ev,
