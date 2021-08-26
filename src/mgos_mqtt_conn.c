@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "mgos_mqtt_conn.h"
+#include "mgos_mqtt_conn_internal.h"
 
 #include <stdlib.h>
 
@@ -23,50 +23,6 @@
 #include "mgos_debug.h"
 #include "mgos_mongoose.h"
 
-struct mgos_mqtt_subscription {
-  struct mg_str topic;
-  uint16_t sub_id;
-  uint8_t qos;
-  mg_event_handler_t handler;
-  void *user_data;
-  SLIST_ENTRY(mgos_mqtt_subscription) next;
-};
-
-struct mgos_mqtt_conn_handler {
-  mg_event_handler_t handler;
-  void *user_data;
-  SLIST_ENTRY(mgos_mqtt_conn_handler) next;
-};
-
-struct mgos_mqtt_conn_queue_entry {
-  char *topic;
-  uint16_t packet_id;
-  // DUP flag on queue entry is used to delay re-delivery.
-  uint16_t flags;
-  struct mg_str msg;
-  STAILQ_ENTRY(mgos_mqtt_conn_queue_entry) next;
-};
-
-struct mgos_mqtt_conn {
-  const struct mgos_config_mqtt *cfg;
-  const struct mgos_config_mqtt *cfg0;
-  const struct mgos_config_mqtt *cfg1;
-  struct mg_connection *nc;
-  int reconnect_timeout_ms;
-  mgos_timer_id reconnect_timer_id;
-  int16_t conn_id;
-  int16_t max_qos;
-  uint16_t packet_id;
-  bool connected;
-  bool queue_drained;
-  mgos_mqtt_connect_fn_t connect_fn;
-  void *connect_fn_arg;
-  SLIST_HEAD(subscriptions, mgos_mqtt_subscription) subscriptions;
-  SLIST_HEAD(conn_handlers, mgos_mqtt_conn_handler) conn_handlers;
-  STAILQ_HEAD(queue, mgos_mqtt_conn_queue_entry) queue;
-};
-
-static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c);
 static void mgos_mqtt_conn_net_ev(int ev, void *evd, void *arg);
 static void mgos_mqtt_free_cfg(struct mgos_config_mqtt *cfg);
 
@@ -212,8 +168,8 @@ static void do_sub(struct mgos_mqtt_conn *c, struct mgos_mqtt_subscription *s) {
   LOG(LL_INFO, ("MQTT%d sub %s @ %d", c->conn_id, te.topic, te.qos));
 }
 
-static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
-                         void *user_data) {
+void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
+                  void *user_data) {
   struct mgos_mqtt_conn *c = (struct mgos_mqtt_conn *) user_data;
   if (c == NULL || nc != c->nc) {
     nc->flags |= MG_F_CLOSE_IMMEDIATELY;
@@ -227,7 +183,8 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
   switch (ev) {
     case MG_EV_CONNECT: {
       int status = *((int *) ev_data);
-      LOG(LL_INFO, ("MQTT%d TCP connect %s (%d)", c->conn_id,
+      LOG(LL_INFO, ("MQTT%d %s connect %s (%d)", c->conn_id,
+                    (cfg->ws_enable ? "WS" : "TCP"),
                     (status == 0 ? "ok" : "error"), status));
       if (status != 0) break;
       struct mg_send_mqtt_handshake_opts opts;
@@ -256,12 +213,15 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
     case MG_EV_CLOSE: {
       LOG(LL_INFO, ("MQTT%d Disconnect", c->conn_id));
       c->nc = NULL;
+      bool connected = c->connected;
       c->connected = false;
-      if (cfg->cloud_events) {
-        struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
-        mgos_event_trigger(MGOS_EVENT_CLOUD_DISCONNECTED, &arg);
+      if (connected) {
+        if (cfg->cloud_events) {
+          struct mgos_cloud_arg arg = {.type = MGOS_CLOUD_MQTT};
+          mgos_event_trigger(MGOS_EVENT_CLOUD_DISCONNECTED, &arg);
+        }
+        call_conn_handlers(c, ev, ev_data);
       }
-      call_conn_handlers(c, ev, ev_data);
       mgos_mqtt_conn_reconnect(c);
       break;
     }
@@ -356,6 +316,9 @@ static void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
     }
   }
 }
+
+void mgos_mqtt_ws_ev(struct mg_connection *nc, int ev, void *ev_data,
+                     void *user_data);
 
 void mgos_mqtt_conn_add_handler(struct mgos_mqtt_conn *c,
                                 mg_event_handler_t handler, void *user_data) {
@@ -474,9 +437,14 @@ bool mgos_mqtt_conn_connect(struct mgos_mqtt_conn *c) {
   mgos_event_trigger(MGOS_EVENT_CLOUD_CONNECTING, &arg);
 
   c->connected = false;
-  c->nc = mg_connect_opt(mgos_get_mgr(), server, mgos_mqtt_ev, c, opts);
+  mg_event_handler_t h = (cfg->ws_enable ? mgos_mqtt_ws_ev : mgos_mqtt_ev);
+  c->nc = mg_connect_opt(mgos_get_mgr(), server, h, c, opts);
   if (c->nc != NULL) {
-    mg_set_protocol_mqtt(c->nc);
+    if (cfg->ws_enable) {
+      mg_set_protocol_http_websocket(c->nc);
+    } else {
+      mg_set_protocol_mqtt(c->nc);
+    }
     c->nc->recv_mbuf_limit = cfg->recv_mbuf_limit;
   } else {
     LOG(LL_ERROR, ("Error: %s", err_str));
@@ -522,7 +490,7 @@ static void mqtt_switch_config(struct mgos_mqtt_conn *c) {
   }
 }
 
-static void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c) {
+void mgos_mqtt_conn_reconnect(struct mgos_mqtt_conn *c) {
   int rt_ms;
   if (c == NULL || c->cfg == NULL || c->cfg->server == NULL ||
       c->reconnect_timeout_ms < 0) {

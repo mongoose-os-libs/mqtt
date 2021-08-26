@@ -33,6 +33,8 @@ config_schema:
   - ["mqtt.require_time", "b", false, {title: "Only connect if (when) wall time is set"}]
   - ["mqtt.cloud_events", "b", true, {title: "Trigger cloud events when connected / disconnected"}]
   - ["mqtt.max_queue_length", "i", 5, {title: "Maximum queue length for buffering QoS 1+ messages. 0 to disable queue."}]
+  - ["mqtt.ws_enable", "b", false, {title: "Enable WebSocket encapsulation"}]
+  - ["mqtt.ws_path", "s", "/mqtt", {title: "Path to use for WebSocket handshake"}]
   # Alternative MQTT configuration. If enabled, client will alternate between mqtt and mqtt1
   # when unable to connect.
   - ["mqtt1", "mqtt", {title: "Backup MQTT settings"}]
