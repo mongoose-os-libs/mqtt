@@ -386,7 +386,7 @@ static bool mgos_mqtt_time_ok(struct mgos_mqtt_conn *c) {
   if (c->cfg == NULL) return false;
   if (!c->cfg->require_time) return true;
   if (mg_time() < 1500000000) {
-    LOG(LL_DEBUG, ("Time is not set, not connecting"));
+    LOG(LL_ERROR, ("Time is not set, not connecting"));
     return false;
   }
   return true;
