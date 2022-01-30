@@ -183,7 +183,7 @@ void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
   switch (ev) {
     case MG_EV_CONNECT: {
       int status = *((int *) ev_data);
-      LOG(LL_INFO, ("MQTT%d %s connect %s (%d)", c->conn_id,
+      LOG(LL_INFO, ("MQTT%d %s connected %s (%d)", c->conn_id,
                     (cfg->ws_enable ? "WS" : "TCP"),
                     (status == 0 ? "ok" : "error"), status));
       if (status != 0) break;
@@ -211,7 +211,7 @@ void mgos_mqtt_ev(struct mg_connection *nc, int ev, void *ev_data,
       break;
     }
     case MG_EV_CLOSE: {
-      LOG(LL_INFO, ("MQTT%d Disconnect", c->conn_id));
+      LOG(LL_INFO, ("MQTT%d disconnected", c->conn_id));
       c->nc = NULL;
       bool connected = c->connected;
       c->connected = false;
@@ -459,6 +459,7 @@ void mgos_mqtt_conn_disconnect(struct mgos_mqtt_conn *c) {
   if (c == NULL) return;
   c->reconnect_timeout_ms = -1;  // Prevent reconnect.
   if (c->nc != NULL) {
+    LOG(LL_INFO, ("MQTT%d disconnect", c->conn_id));
     mg_mqtt_disconnect(c->nc);
     c->nc->flags |= MG_F_SEND_AND_CLOSE;
   }
