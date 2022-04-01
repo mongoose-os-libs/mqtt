@@ -187,6 +187,7 @@ bool mgos_mqtt_init(void) {
 
   LOG(LL_DEBUG, ("mqtt log_level %d | debug_use_log_level %d", 99,
          mgos_sys_config_get_mqtt_debug_use_log_level() ? 1 : 0));
+  
   mgos_event_add_handler(MGOS_EVENT_LOG, s_debug_write_cb, NULL);
 
   return true;
