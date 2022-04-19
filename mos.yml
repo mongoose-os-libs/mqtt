@@ -36,7 +36,7 @@ config_schema:
   - ["mqtt.ws_enable", "b", false, {title: "Enable WebSocket encapsulation"}]
   - ["mqtt.ws_path", "s", "/mqtt", {title: "Path to use for WebSocket handshake"}]
   - ["mqtt.debug_use_log_level", "b", false, {title: "Use the cs_log_level enum instead of stdout/stderr flag"}]
-# Alternative MQTT configuration. If enabled, client will alternate between mqtt and mqtt1
+  # Alternative MQTT configuration. If enabled, client will alternate between mqtt and mqtt1
   # when unable to connect.
   - ["mqtt1", "mqtt", {title: "Backup MQTT settings"}]
   - ["mqtt1.enable", false]
