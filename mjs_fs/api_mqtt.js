@@ -44,7 +44,8 @@ let MQTT = {
   // ```
   pub: function(t, m, qos, retain) {
     qos = qos || 0;
-    return this._pub(t, m, m.length, qos, retain || false);
+    let message = typeof m === "number" ? JSON.stringify( m ) : m;
+    return this._pub(t, message, message.length, qos, retain || false);
   },
 
   // ## **`MQTT.setEventHandler(handler, userdata)`**
